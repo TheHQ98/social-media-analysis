@@ -9,10 +9,16 @@ import os # 建议使用环境变量存储敏感信息
 # export REDDIT_USER_AGENT='MyPopularPostFetcher/1.0 by YourRedditUsername'
 
 # 从环境变量获取凭据，如果不存在则使用占位符
-client_id = "6rqxBqNWanUh2pfr4l7T0A"
-client_secret = "IJbvOSpUBjRh88RDqL8LTxDcuQ83sA"
+client_id = os.environ.get('REDDIT_CLIENT_ID', 'YOUR_CLIENT_ID')
+client_secret = os.environ.get('REDDIT_CLIENT_SECRET', 'YOUR_CLIENT_SECRET')
 # user_agent 应该包含你的应用名称、版本和你的 Reddit 用户名
-user_agent = os.environ.get('REDDIT_USER_AGENT', 'MyPopularPostFetcher/1.0 by Ordi_P')
+user_agent = os.environ.get('REDDIT_USER_AGENT', 'YOUR_USER_AGENT')
+
+# 检查是否使用了默认占位符，如果是，则提示用户替换
+if client_id == 'YOUR_CLIENT_ID' or client_secret == 'YOUR_CLIENT_SECRET' or user_agent == 'YOUR_USER_AGENT':
+    print("请替换代码中的 'YOUR_CLIENT_ID', 'YOUR_CLIENT_SECRET' 和 'YOUR_USER_AGENT' 为你自己的信息。")
+    print("或者设置环境变量 REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT。")
+    exit() # 退出程序，直到用户配置好凭据
 
 # --- 初始化 PRAW ---
 try:
@@ -55,5 +61,3 @@ try:
 
 except Exception as e:
     print(f"发生错误: {e}")
-
-print("hi")
