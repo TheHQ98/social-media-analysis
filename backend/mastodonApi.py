@@ -96,16 +96,15 @@ def fetch_posts(limit=5):
 
 
 def main():
-    posts = fetch_posts(limit=5)
+    posts = fetch_posts(limit=100)  
 
-    for item in posts:
-        print(
-            json.dumps(
-                item,
-                ensure_ascii=False,
-                default=str
-            )
-        )
+    output_file = "mastodon_output.ndjson"
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        for item in posts:
+            f.write(json.dumps(item, ensure_ascii=False, default=str) + "\n")
+
+    print(f"saved {len(posts)} posts to {output_file}")
 
 
 if __name__ == "__main__":
