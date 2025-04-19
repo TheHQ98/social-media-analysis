@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 
 
-def fetch_posts(limit=5):
+def fetch_posts(limit):
     load_dotenv()
     access_token = os.getenv("ACCESS_TOKEN")
     api_base = os.getenv("API_BASE_URL", "https://mastodon.social")
@@ -96,15 +96,30 @@ def fetch_posts(limit=5):
 
 
 def main():
-    posts = fetch_posts(limit=100)  
-
     output_file = "mastodon_output.ndjson"
+    existing_lines = 0
+    if os.path.exists(output_file):
+        with open(output_file, "r", encoding="utf-8") as f:
+            existing_lines = sum(1 for _ in f)
 
-    with open(output_file, "w", encoding="utf-8") as f:
+    file_exists = os.path.exists(output_file)
+    if file_exists:
+        print(f"File '{output_file}' exists. Appending new data")
+    else:
+        print(f"File '{output_file}' does not exist. Creating new database")
+
+    # Fetch new posts
+    posts = fetch_posts(limit=40)
+
+    # Append or create file
+    with open(output_file, "a", encoding="utf-8") as f:
         for item in posts:
             f.write(json.dumps(item, ensure_ascii=False, default=str) + "\n")
 
-    print(f"saved {len(posts)} posts to {output_file}")
+    if file_exists:
+        print(f"Appended {len(posts)} new posts to '{output_file}'. {existing_lines + len(posts)} in total")
+    else:
+        print(f"Created '{output_file}' and wrote {len(posts)} posts.  ")
 
 
 if __name__ == "__main__":
