@@ -19,107 +19,59 @@ def fetch_posts(limit):
     results = []
 
     for post in posts:
-        doc = {
-            "sensitive": post.get("sensitive"),
-            "createdAt": post.get("created_at").isoformat(),
+        data = {
+            "id": post.get("id"),
+            "createdAt": post.get("created_at").isoformat() + "Z" if post.get("created_at") else None,
             "content": post.get("content"),
-            "sentiment": post.get("sentiment"),
-            "filtered": post.get("filtered"),
-            "favouritesCount": post.get("favouritesCount"),
-            "url": post.get("url"),
-            "mentions": [m["acct"] for m in post.get("mentions", [])],
-            "inReplyTold": post.get("inReplyTold"),
-            "tags": [t["name"] for t in post.get("tags", [])],
-            "visibility": post.get("visibility"),
-            "inReplyToAccountId": post.get("inReplyToAccountId"),
-            "repliesCount": post.get("repliesCount"),
-            "editedAt": post.get("edited_at").isoformat() if post.get("edited_at") else None,
-            "reblog": post.get("reblog"),
-            "spoilerText": post.get("spoiler_text"),
-            "reblogsCount": post.get("reblogs_count"),
+            "sensitive": post.get("sensitive", False),
+            "spoilerText": post.get("spoiler_text", ""),
             "language": post.get("language"),
-            "inReplyToId": post.get("in_reply_to_id"),
-            "emojis": post.get("emojis", []),
-            "card": post.get("card"),
-            "uri": post.get("uri"),
-            "poll": post.get("poll"),
-            "mediaAttachments": [
-                {
-                    "url": media.get("url"),
-                    "previewUrl": media.get("preview_url"),
-                    "type": media.get("type"),
-                    "meta": media.get("meta")
-                }
-                for media in post.get("media_attachments", [])
-            ],
+            "visibility": post.get("visibility", "public"),
+            "favouritesCount": post.get("favourites_count", 0),
+            "reblogsCount": post.get("reblogs_count", 0),
+            "repliesCount": post.get("replies_count", 0),
+            "tags": [t["name"] for t in post.get("tags", [])],
+            "url": post.get("url"),
+
             "account": {
-                "username": post["account"]["username"],
-                "createdAt": post["account"].get("created_at").isoformat() if post["account"].get(
-                    "created_at") else None,
-                "indexable": post["account"].get("indexable"),
                 "id": post["account"].get("id"),
-                "acct": post["account"]["acct"],
-                "displayName": post["account"]["display_name"],
-                "url": post["account"]["url"],
-                "avatar": post["account"]["avatar"],
-                "header": post["account"]["header"],
-                "note": post["account"]["note"],
-                "followersCount": post["account"]["followers_count"],
-                "followingCount": post["account"]["following_count"],
-                "statusesCount": post["account"]["statuses_count"],
-                "avatarStatic": post["account"].get("avatar_static"),
-                "lastStatusAt": post["account"].get("last_status_at"),
-                "locked": post["account"].get("locked"),
-                "fields": post["account"].get("fields", []),
-                "headerStatic": post["account"].get("header_static"),
+                "username": post["account"].get("username"),
+                "acct": post["account"].get("acct"),
+                "displayName": post["account"].get("display_name"),
+                "createdAt": post["account"]["created_at"].isoformat() + "Z"
+                if post["account"].get("created_at") else None,
+                "followersCount": post["account"].get("followers_count", 0),
+                "followingCount": post["account"].get("following_count", 0),
+                "statusesCount": post["account"].get("statuses_count", 0),
                 "bot": post["account"].get("bot"),
-                "hideCollections": post["account"].get("hide_collections"),
-                "group": post["account"].get("group"),
-                "emojis": post["account"].get("emojis", []),
-                "uri": post["account"].get("uri"),
-                "discoverable": post["account"].get("discoverable"),
+                "note": post["account"].get("note", "")
             }
         }
 
-        api_meta = {
-            "version": "1.0",
-            "type": "Mastodon",
-            "fetchedAt": datetime.utcnow().isoformat() + "Z"
-        }
-
         results.append({
-            "doc": doc,
-            "api": api_meta
+            "platform": "Mastodon",
+            "version": 1.0,
+            "fetchedAt": datetime.utcnow().isoformat() + "Z",
+            "sentiment": None,
+            "data": data
         })
 
     return results
 
 
 def main():
-    output_file = "mastodon_output.ndjson"
-    existing_lines = 0
-    if os.path.exists(output_file):
-        with open(output_file, "r", encoding="utf-8") as f:
-            existing_lines = sum(1 for _ in f)
-
-    file_exists = os.path.exists(output_file)
-    if file_exists:
-        print(f"File '{output_file}' exists. Appending new data")
-    else:
-        print(f"File '{output_file}' does not exist. Creating new database")
-
     # Fetch new posts
     posts = fetch_posts(limit=40)
 
-    # Append or create file
-    with open(output_file, "a", encoding="utf-8") as f:
-        for item in posts:
-            f.write(json.dumps(item, ensure_ascii=False, default=str) + "\n")
-
-    if file_exists:
-        print(f"Appended {len(posts)} new posts to '{output_file}'. {existing_lines + len(posts)} in total")
-    else:
-        print(f"Created '{output_file}' and wrote {len(posts)} posts.  ")
+    # Print out
+    for post in posts:
+        print(
+            json.dumps(
+                post,
+                ensure_ascii=False,
+                default=str
+            )
+        )
 
 
 if __name__ == "__main__":
