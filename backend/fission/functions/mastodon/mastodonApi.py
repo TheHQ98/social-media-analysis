@@ -69,16 +69,15 @@ def main():
     # Fetch new posts
     posts = fetch_posts(limit=LIMIT)
 
-    for post in posts:
-        try:
-            res = requests.post(
-                url="http://router.fission.svc.cluster.local/enqueue/mastodon",
-                json=post,
-                timeout=5
-            )
-            print(res.status_code, res.text)
-        except Exception as e:
-            print(f"Error pushing to queue: {e}")
+    try:
+        res = requests.post(
+            url="http://router.fission.svc.cluster.local/enqueue/mastodon",
+            json=posts,
+            timeout=15
+        )
+        print(res.status_code, res.text)
+    except Exception as e:
+        print(f"Error pushing to queue: {e}")
 
     return "OK"
 

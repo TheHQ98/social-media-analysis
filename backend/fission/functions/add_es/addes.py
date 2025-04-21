@@ -23,15 +23,17 @@ def main() -> str:
 
     current_app.logger.info(f"[addes] Got {len(records)} record(s) from queue")
 
-    for rec in records:
-        doc_id = rec.get("id")
+    for record in records:
+        doc_id = record["data"]["id"]
+        index_name = record["platform"].lower()
+
         resp = es.index(
-            index="mastodon",
+            index=index_name,
             id=doc_id,
-            body=rec
+            body=record
         )
         current_app.logger.info(
-            f"[addes] Indexed {doc_id}, version={resp.get('_version')}"
+            f"[addes] Indexed {doc_id}, platform={index_name}, platform={resp}"
         )
 
     return "OK"
