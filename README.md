@@ -2,20 +2,20 @@
 
 
 
-## install mastondon script
+## install mastodon script
 
 ```bash
 
-fission package create --spec --name mastondon \
-	--source ./functions/mastondon/__init__.py \
-	--source ./functions/mastondon/mastodonApi.py \
-	--source ./functions/mastondon/requirements.txt \
-	--source ./functions/mastondon/build.sh \
+fission package create --spec --name mastodon \
+	--source ./functions/mastodon/__init__.py \
+	--source ./functions/mastodon/mastodonApi.py \
+	--source ./functions/mastodon/requirements.txt \
+	--source ./functions/mastodon/build.sh \
 	--env python39x \
 	--buildcmd './build.sh'
 
-fission function create --spec --name mastondon \
-    --pkg mastondon \
+fission function create --spec --name mastodon \
+    --pkg mastodon \
     --env python39x \
     --configmap masto-config \
     --entrypoint "mastodonApi.main"
@@ -36,14 +36,14 @@ fission function create --spec --name addes \
 
 fission timer create --spec \
 	--name mastodon-api \
-	--function mastondon \
+	--function mastodon \
 	--cron "@every 30s"
 
 fission httptrigger create --spec \
-	--name mastondon-trigger \
+	--name mastodon-trigger \
 	--url "/mastodon" \
 	--method GET \
-	--function mastondon
+	--function mastodon
 
 fission mqtrigger create --spec --name mastodon-addes \
   --function addes \

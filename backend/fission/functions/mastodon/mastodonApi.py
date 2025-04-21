@@ -1,11 +1,9 @@
 import json
 from datetime import datetime
 from mastodon import Mastodon
-from dotenv import load_dotenv
-import os
 import requests
 
-LIMIT = 5
+LIMIT = 40
 
 
 def config(k: str) -> str:
@@ -15,18 +13,15 @@ def config(k: str) -> str:
 
 
 def fetch_posts(limit):
-    # load_dotenv()
-    # access_token = os.getenv("ACCESS_TOKEN")
-    # api_base = os.getenv("API_BASE_URL", "https://mastodon.social")
     access_token = config('ACCESS_TOKEN')
     api_base = config('API_BASE_URL')
 
-    masto = Mastodon(
+    mastodon = Mastodon(
         access_token=access_token,
         api_base_url=api_base
     )
 
-    posts = masto.timeline_public(limit=limit)
+    posts = mastodon.timeline_public(limit=limit)
     results = []
 
     for post in posts:
@@ -72,17 +67,7 @@ def fetch_posts(limit):
 
 def main():
     # Fetch new posts
-    posts = fetch_posts(limit=40)
-
-    # Print out
-    # for post in posts:
-    #     print(
-    #         json.dumps(
-    #             post,
-    #             ensure_ascii=False,
-    #             default=str
-    #         )
-    #     )
+    posts = fetch_posts(limit=LIMIT)
 
     for post in posts:
         try:

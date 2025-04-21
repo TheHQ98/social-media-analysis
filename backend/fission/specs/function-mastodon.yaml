@@ -2,7 +2,7 @@ apiVersion: fission.io/v1
 kind: Function
 metadata:
   creationTimestamp: null
-  name: mastondon
+  name: mastodon
 spec:
   InvokeStrategy:
     ExecutionStrategy:
@@ -24,7 +24,7 @@ spec:
   package:
     functionName: mastodonApi.main
     packageref:
-      name: mastondon
+      name: mastodon
       namespace: ""
   requestsPerPod: 1
   resources: {}

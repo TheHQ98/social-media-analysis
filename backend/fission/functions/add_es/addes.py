@@ -9,6 +9,7 @@ ES_AUTH = ("elastic", "elastic")
 
 def main() -> str:
     """
+    get data from redis list, and send to elasticsearch
     """
     es = Elasticsearch(
         ES_URL,
