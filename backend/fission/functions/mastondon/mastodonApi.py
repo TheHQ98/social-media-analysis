@@ -3,12 +3,23 @@ from datetime import datetime
 from mastodon import Mastodon
 from dotenv import load_dotenv
 import os
+import requests
+
+LIMIT = 5
+
+
+def config(k: str) -> str:
+    """Reads configuration from file."""
+    with open(f'/configs/default/masto-config/{k}', 'r') as f:
+        return f.read()
 
 
 def fetch_posts(limit):
-    load_dotenv()
-    access_token = os.getenv("ACCESS_TOKEN")
-    api_base = os.getenv("API_BASE_URL", "https://mastodon.social")
+    # load_dotenv()
+    # access_token = os.getenv("ACCESS_TOKEN")
+    # api_base = os.getenv("API_BASE_URL", "https://mastodon.social")
+    access_token = config('ACCESS_TOKEN')
+    api_base = config('API_BASE_URL')
 
     masto = Mastodon(
         access_token=access_token,
@@ -64,14 +75,27 @@ def main():
     posts = fetch_posts(limit=40)
 
     # Print out
+    # for post in posts:
+    #     print(
+    #         json.dumps(
+    #             post,
+    #             ensure_ascii=False,
+    #             default=str
+    #         )
+    #     )
+
     for post in posts:
-        print(
-            json.dumps(
-                post,
-                ensure_ascii=False,
-                default=str
+        try:
+            res = requests.post(
+                url="http://router.fission.svc.cluster.local/enqueue/mastodon",
+                json=post,
+                timeout=5
             )
-        )
+            print(res.status_code, res.text)
+        except Exception as e:
+            print(f"Error pushing to queue: {e}")
+
+    return "OK"
 
 
 if __name__ == "__main__":

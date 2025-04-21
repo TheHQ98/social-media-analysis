@@ -1,6 +1,0 @@
-Mastodon.py            # Used to interact with the Mastodon API for fetching public posts
-python-dotenv          # Loads environment variables (like API tokens) from a .env file
-beautifulsoup4         # Cleans HTML content from Mastodon posts to extract readable text
-vaderSentiment         # Performs sentiment analysis on post content (positive, negative, neutral)
-matplotlib             # Visualizes sentiment distribution using charts (e.g., pie charts)
-nltk                   # Used for natural language processing tasks, such as removing stopwords
