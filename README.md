@@ -1,93 +1,94 @@
-# COMP90024_team_55
+# Reddit Fetcher
 
+一个使用 PRAW 库从 Reddit 获取帖子和评论的 Python 脚本。
 
+## 功能
 
-## Getting started
+*   使用环境变量中的凭据初始化 PRAW。
+*   从指定的 subreddit 获取帖子（按热门、最新、评分最高等排序）。
+*   根据关键词搜索帖子。
+*   获取指定 subreddit 的随机帖子。
+*   获取帖子的评论，可指定深度。
+*   提供格式化帖子和评论数据的辅助函数。
+*   包含基本用法示例。
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## 要求
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+*   Python 3.x
+*   PRAW 库 (`pip install praw`)
+*   Reddit API 凭据
 
-## Add your files
+## 设置
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+在运行脚本之前，你需要设置以下环境变量：
+
+*   `REDDIT_CLIENT_ID`: 你的 Reddit 应用 Client ID。
+*   `REDDIT_CLIENT_SECRET`: 你的 Reddit 应用 Client Secret。
+*   `REDDIT_USER_AGENT`: 一个描述性的 User Agent 字符串 (例如 `'MyRedditBot/1.0 by u/YourUsername'`)。
+
+你可以通过在终端中导出它们来设置这些变量：
+
+```bash
+export REDDIT_CLIENT_ID='你的客户端ID'
+export REDDIT_CLIENT_SECRET='你的客户端密钥'
+export REDDIT_USER_AGENT='你的用户代理'
+```
+
+或者将它们添加到你的 `.env` 文件中，并使用像 `python-dotenv` 这样的库来加载它们。
+
+## 用法
+
+你可以将 [`reddit_fetcher.py`](reddit_fetcher.py) 中的函数导入到你自己的 Python 脚本中。
+
+```python
+import reddit_fetcher
+import os
+
+# 确保环境变量已设置
+# 例如：
+# os.environ['REDDIT_CLIENT_ID'] = 'YOUR_ID'
+# os.environ['REDDIT_CLIENT_SECRET'] = 'YOUR_SECRET'
+# os.environ['REDDIT_USER_AGENT'] = 'YOUR_AGENT'
+
+# 初始化 Reddit 实例
+reddit = reddit_fetcher.initialize_reddit()
+
+if reddit:
+    # 获取 'learnpython' subreddit 的最新 5 个帖子
+    posts = reddit_fetcher.get_subreddit_posts(reddit, 'learnpython', sort='new', limit=5)
+    for post in posts:
+        post_data = reddit_fetcher.format_post_data(post)
+        print(f"- {post_data['title']}")
+
+    # 搜索包含 'api' 的帖子
+    search_results = reddit_fetcher.search_posts(reddit, query='api', limit=3)
+    for post in search_results:
+        print(f"Search Result: {post.title}")
+
+    # 获取第一个搜索结果的评论
+    if search_results:
+        comments = reddit_fetcher.get_post_comments(search_results[0], limit=5, depth=1)
+        for comment in comments:
+             if isinstance(comment, praw.models.Comment): # 确保是评论对象
+                comment_data = reddit_fetcher.format_comment_data(comment)
+                print(f"  - Comment by {comment_data['author']}: {comment_data['body'][:50]}...")
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.unimelb.edu.au/chenhaof/comp90024_team_55.git
-git branch -M main
-git push -uf origin main
+
+## 运行示例
+
+脚本包含一个 `if __name__ == "__main__":` 块，其中包含一些使用示例。你可以直接运行脚本来查看这些示例的输出：
+
+```bash
+python reddit_fetcher.py
 ```
 
-## Integrate with your tools
+## 主要函数
 
-- [ ] [Set up project integrations](https://gitlab.unimelb.edu.au/chenhaof/comp90024_team_55/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+*   [`initialize_reddit()`](reddit_fetcher.py): 初始化并返回 PRAW Reddit 实例。
+*   [`get_subreddit_posts()`](reddit_fetcher.py): 从 subreddit 获取帖子。
+*   [`search_posts()`](reddit_fetcher.py): 搜索帖子。
+*   [`get_random_post()`](reddit_fetcher.py): 获取随机帖子。
+*   [`get_post_comments()`](reddit_fetcher.py): 获取帖子的评论。
+*   [`format_post_data()`](reddit_fetcher.py): 将帖子对象格式化为字典。
+*   [`format_comment_data()`](reddit_fetcher.py): 将评论对象格式化为字典。
