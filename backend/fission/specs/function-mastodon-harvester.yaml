@@ -2,7 +2,7 @@ apiVersion: fission.io/v1
 kind: Function
 metadata:
   creationTimestamp: null
-  name: mastodon
+  name: mastodon-harvester
 spec:
   InvokeStrategy:
     ExecutionStrategy:
@@ -22,9 +22,9 @@ spec:
   functionTimeout: 60
   idletimeout: 120
   package:
-    functionName: mastodonApi.main
+    functionName: mastodon_harvester.main
     packageref:
-      name: mastodon
+      name: mastodon-harvester
       namespace: ""
   requestsPerPod: 1
   resources: {}

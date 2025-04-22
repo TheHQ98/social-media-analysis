@@ -3,6 +3,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from mastodon import Mastodon
 import requests
+from flask import current_app
 
 LIMIT = 40
 YEARS = 3
@@ -10,7 +11,9 @@ TAG = "trump"
 
 
 def config(k: str) -> str:
-    """Reads configuration from file."""
+    """
+    Reads configuration from masto-config file
+    """
     with open(f'/configs/default/masto-config/{k}', 'r') as f:
         return f.read()
 
@@ -108,20 +111,21 @@ def fetch_tags_and_send_posts():
                     json=doc,
                     timeout=5
                 )
-                print(f"Sent post ID {doc['data']['id']}: {res.status_code}")
                 sent += 1
 
             except Exception as e:
-                print(f"Error pushing to queue: {e}")
+                current_app.logger.error(f"Error pushing to queue: {e}")
 
         max_id = int(posts[-1]["id"]) - 1
         time.sleep(0.5)
 
 
 def main():
+    # fetch number of limit post
     posts = fetch_posts(limit=LIMIT)
     # fetch_tags_and_send_posts()
 
+    # send to enqueue/mastodon
     for post in posts:
         try:
             res = requests.post(
@@ -130,7 +134,7 @@ def main():
                 timeout=5
             )
         except Exception as e:
-            print(f"Error pushing to queue: {e}")
+            current_app.logger.error(f"Error pushing to queue: {e}")
 
     return "OK: fetched mastodon posts"
 

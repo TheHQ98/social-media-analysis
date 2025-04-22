@@ -2,12 +2,12 @@ apiVersion: fission.io/v1
 kind: HTTPTrigger
 metadata:
   creationTimestamp: null
-  name: mastodon-trigger
+  name: mastodon-harvester-trigger
 spec:
   createingress: false
   functionref:
     functionweights: null
-    name: mastodon
+    name: mastodon-harvester
     type: name
   host: ""
   ingressconfig:
