@@ -1,8 +1,9 @@
 import praw
 import os
 import sys
-import time # 用于定时抓取的示例 (虽然不推荐在库内实现)
-import random # 用于随机抽样
+import time
+import random
+from datetime import datetime, timezone # 新增导入
 
 # --- Reddit 初始化 ---
 
@@ -277,7 +278,7 @@ def get_post_comments(post, limit=None, depth=1):
 
 # --- 数据格式化 (示例，通常由调用者完成) ---
 def format_post_data(post):
-    """将 PRAW Submission 对象格式化为字典 (示例)。"""
+    """将 PRAW Submission 对象格式化为字典 (示例 - 这是转换前的“原始”结构之一)。"""
     author_name = f"u/{post.author.name}" if post.author else "[已删除]"
     return {
         "id": post.id,
@@ -286,12 +287,15 @@ def format_post_data(post):
         "author": author_name,
         "score": post.score,
         "num_comments": post.num_comments,
-        "url": post.url,
+        "url": post.url, # 指向内容的 URL (可能是外部链接或帖子本身)
+        "permalink": f"https://www.reddit.com{post.permalink}", # 指向 Reddit 帖子的永久链接
         "selftext": post.selftext if post.is_self else None,
         "created_utc": post.created_utc,
         "flair": post.link_flair_text,
         "is_self": post.is_self,
         "upvote_ratio": post.upvote_ratio,
+        "over_18": post.over_18, # NSFW 标记
+        "spoiler": post.spoiler, # 剧透标记
         # 可以添加更多字段
     }
 
@@ -310,6 +314,99 @@ def format_comment_data(comment):
         # 可以添加更多字段
     }
 
+# --- 新增：转换为目标 JSON 结构的函数 ---
+def convert_reddit_post_to_target_format(post: praw.models.Submission):
+    """
+    将 PRAW Submission 对象转换为指定的目标 JSON 结构。
+
+    Args:
+        post (praw.models.Submission): Reddit 帖子对象。
+
+    Returns:
+        dict: 符合目标结构的字典。
+    """
+    fetched_at = datetime.now(timezone.utc).isoformat(timespec='seconds') + 'Z'
+    created_at = datetime.fromtimestamp(post.created_utc, timezone.utc).isoformat(timespec='seconds') + 'Z'
+
+    account_data = None
+    if post.author:
+        try:
+            # 尝试获取作者创建时间，如果失败则设为 None
+            author_created_at = datetime.fromtimestamp(post.author.created_utc, timezone.utc).isoformat(timespec='seconds') + 'Z'
+        except Exception: # 可能因为作者信息不完整或 PRAW 限制
+             author_created_at = None
+
+        # 尝试获取作者描述，如果失败则设为 None
+        author_note = None
+        try:
+            # 访问 post.author.subreddit['public_description'] 可能需要额外的 API 调用或权限
+            # 在只读模式下可能受限，安全起见设为 None 或根据需要调整
+            # author_note = post.author.subreddit.get('public_description', None) if post.author.subreddit else None
+            pass # 暂时不获取 note 以避免潜在问题
+        except Exception:
+            author_note = None
+
+
+        account_data = {
+            "id": post.author.id,
+            "username": post.author.name,
+            "acct": f"{post.author.name}@reddit.com", # 构造的账号格式
+            "displayName": post.author.name, # Reddit 没有单独的显示名
+            "createdAt": author_created_at,
+            "followersCount": None, # PRAW 只读模式不易获取
+            "followingCount": None, # Reddit 无此概念
+            "statusesCount": None, # PRAW 不易直接获取总发帖/评论数
+            "bot": False, # 无法直接判断，默认为 False
+            "note": author_note # 用户 Profile 的描述 (可能为 None)
+        }
+    else: # 处理已删除用户
+         account_data = {
+            "id": None,
+            "username": "[已删除]",
+            "acct": "[已删除]@reddit.com",
+            "displayName": "[已删除]",
+            "createdAt": None,
+            "followersCount": None,
+            "followingCount": None,
+            "statusesCount": None,
+            "bot": False,
+            "note": None
+        }
+
+    # 确定 content 字段内容
+    content = post.title
+    if post.is_self and post.selftext:
+        content += f"\n\n{post.selftext}" # 如果是自包含帖子，将内容附加到标题后
+
+    # 处理 tags
+    tags = []
+    if post.link_flair_text:
+        tags.append(post.link_flair_text) # 使用 Flair 作为 Tag
+
+    data = {
+        "id": post.id,
+        "createdAt": created_at,
+        "content": content,
+        "sensitive": post.over_18, # 将 NSFW 映射为 sensitive
+        "spoilerText": "Spoiler" if post.spoiler else "", # 将剧透标记转换为文本
+        "language": None, # Reddit API 不直接提供帖子语言
+        "visibility": "public", # Reddit 帖子通常是公开的
+        "favouritesCount": post.score, # 使用 score 作为点赞数的近似值
+        "reblogsCount": post.num_crossposts, # 使用 crossposts 作为转发数的近似值
+        "repliesCount": post.num_comments,
+        "tags": tags,
+        "url": f"https://www.reddit.com{post.permalink}", # 帖子的 Reddit 链接
+        "account": account_data
+    }
+
+    return {
+        "platform": "Reddit",
+        "version": 1.0,
+        "fetchedAt": fetched_at,
+        "sentiment": None, # 初始为 null
+        "data": data
+    }
+
 
 # --- 示例用法与定时抓取说明 ---
 if __name__ == "__main__":
@@ -319,10 +416,19 @@ if __name__ == "__main__":
     if reddit:
         # --- 示例 1: 获取指定 Subreddit 的最新帖子 ---
         print("\n--- 示例 1: 获取 r/trump 的最新帖子 ---")
-        latest_python_posts = get_subreddit_posts(reddit, 'trump', sort='new', limit=3)
-        for post in latest_python_posts:
-            post_data = format_post_data(post)
-            print(f"  - [{post_data['subreddit']}] {post_data['title']} (Score: {post_data['score']}, Flair: {post_data['flair']})")
+        latest_python_posts = get_subreddit_posts(reddit, 'trump', sort='new', limit=1) # 只获取 1 个用于演示
+        if latest_python_posts:
+            post = latest_python_posts[0]
+            print("\n原始结构 (来自 format_post_data):")
+            original_data = format_post_data(post)
+            import json # 导入 json 库以便更好地打印字典
+            print(json.dumps(original_data, indent=2, ensure_ascii=False))
+
+            print("\n转换后的目标结构:")
+            converted_data = convert_reddit_post_to_target_format(post)
+            print(json.dumps(converted_data, indent=2, ensure_ascii=False))
+        else:
+            print("未能获取到帖子。")
 
         # --- 示例 2: 搜索包含特定关键词的帖子 ---
         print("\n--- 示例 2: 搜索包含 'MAGA' 的帖子 ---")
@@ -330,10 +436,10 @@ if __name__ == "__main__":
         for post in search_results:
             post_data = format_post_data(post)
             print(f"  - [{post_data['subreddit']}] {post_data['title']} (Score: {post_data['score']})")
-            
+
         # --- 示例 3: 获取帖子的评论 ---
         if latest_python_posts:
-            target_post = search_results[0] # 获取第一篇帖子的评论
+            target_post = latest_python_posts[0] # 获取第一篇帖子的评论
             print(f"\n--- 示例 3: 获取帖子 '{target_post.title}' 的顶级评论 ---")
             comments = get_post_comments(target_post, limit=5, depth=1) # 获取最多5条顶级评论
             print(f"帖子总评论数: {target_post.num_comments}") # 显示帖子实际评论数
@@ -350,38 +456,24 @@ if __name__ == "__main__":
         if random_post:
             post_data = format_post_data(random_post)
             print(f"  - 随机帖子: [{post_data['subreddit']}] {post_data['title']}")
-        # 注意: get_random_post 依赖的 subreddit.random() 可能不稳定或在某些 subreddits 上失败 (如示例输出所示)。
 
         # --- 示例 5: 按 Flair 和时间范围过滤 ---
         print("\n--- 示例 5: 获取 r/trump 过去一天内的热门帖子并检查各种Flair ---")
         now_utc = time.time()
         one_day_ago_utc = now_utc - (24 * 60 * 60)
-        
-        # 先获取热门帖子，不按Flair过滤
         hot_posts = get_subreddit_posts(
-            reddit,
-            'trump',
-            sort='hot',
-            limit=20,
-            start_time=one_day_ago_utc,
-            end_time=now_utc
+            reddit, 'trump', sort='hot', limit=20,
+            start_time=one_day_ago_utc, end_time=now_utc
         )
-        
-        # 统计并显示所有Flair
         flairs = {}
         for post in hot_posts:
             flair = post.link_flair_text
-            if flair:
-                flairs[flair] = flairs.get(flair, 0) + 1
-                
+            if flair: flairs[flair] = flairs.get(flair, 0) + 1
         print(f"过去一天内发现的Flair类型: {flairs if flairs else '无'}")
-        
-        # 如果找到了Flair，尝试使用最常见的Flair进行过滤
         if flairs:
             most_common_flair = max(flairs.items(), key=lambda x: x[1])[0]
             print(f"\n使用最常见的Flair '{most_common_flair}' 进行过滤:")
-            
-            filtered_posts = [post for post in hot_posts if post.link_flair_text == most_common_flair]
+            filtered_posts = [p for p in hot_posts if p.link_flair_text == most_common_flair]
             for post in filtered_posts:
                 post_data = format_post_data(post)
                 print(f"  - [{post_data['subreddit']}] {post_data['title']} (Flair: {post_data['flair']}, Created: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(post_data['created_utc']))} UTC)")
