@@ -2,14 +2,14 @@ apiVersion: fission.io/v1
 kind: MessageQueueTrigger
 metadata:
   creationTimestamp: null
-  name: mastodon-addes
+  name: post-processor
 spec:
   contentType: application/json
   cooldownPeriod: 300
   errorTopic: errors
   functionref:
     functionweights: null
-    name: addes
+    name: post-processor
     type: name
   maxReplicaCount: 100
   maxRetries: 3
@@ -17,8 +17,8 @@ spec:
   metadata:
     address: redis-headless.redis.svc.cluster.local:6379
     listLength: "100"
-    listName: elastic
+    listName: mastodon
   minReplicaCount: 0
   mqtkind: keda
   pollingInterval: 30
-  topic: elastic
+  topic: mastodon
