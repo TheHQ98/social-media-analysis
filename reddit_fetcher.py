@@ -333,44 +333,29 @@ def convert_reddit_post_to_target_format(post: praw.models.Submission):
         try:
             # 尝试获取作者创建时间，如果失败则设为 None
             author_created_at = datetime.fromtimestamp(post.author.created_utc, timezone.utc).isoformat(timespec='seconds') + 'Z'
+            # 获取 karma 数据
+            link_karma = post.author.link_karma
+            comment_karma = post.author.comment_karma
         except Exception: # 可能因为作者信息不完整或 PRAW 限制
              author_created_at = None
-
-        # 尝试获取作者描述，如果失败则设为 None
-        author_note = None
-        try:
-            # 访问 post.author.subreddit['public_description'] 可能需要额外的 API 调用或权限
-            # 在只读模式下可能受限，安全起见设为 None 或根据需要调整
-            # author_note = post.author.subreddit.get('public_description', None) if post.author.subreddit else None
-            pass # 暂时不获取 note 以避免潜在问题
-        except Exception:
-            author_note = None
-
+             link_karma = None
+             comment_karma = None
 
         account_data = {
             "id": post.author.id,
             "username": post.author.name,
-            "acct": f"{post.author.name}@reddit.com", # 构造的账号格式
-            "displayName": post.author.name, # Reddit 没有单独的显示名
             "createdAt": author_created_at,
-            "followersCount": None, # PRAW 只读模式不易获取
-            "followingCount": None, # Reddit 无此概念
-            "statusesCount": None, # PRAW 不易直接获取总发帖/评论数
-            "bot": False, # 无法直接判断，默认为 False
-            "note": author_note # 用户 Profile 的描述 (可能为 None)
+            "followersCount/linkKarma": link_karma, # 使用 link_karma
+            "followingCount/commentKarma": comment_karma, # 使用 comment_karma
         }
     else: # 处理已删除用户
          account_data = {
             "id": None,
-            "username": "[已删除]",
-            "acct": "[已删除]@reddit.com",
-            "displayName": "[已删除]",
+            "username": "[Deleted]",
+            # Reddit API 不提供已删除用户的创建时间
             "createdAt": None,
-            "followersCount": None,
-            "followingCount": None,
-            "statusesCount": None,
-            "bot": False,
-            "note": None
+            "followersCount/linkKarma": None, # 已删除用户无 karma
+            "followingCount/commentKarma": None, # 已删除用户无 karma
         }
 
     # 确定 content 字段内容
@@ -388,11 +373,7 @@ def convert_reddit_post_to_target_format(post: praw.models.Submission):
         "createdAt": created_at,
         "content": content,
         "sensitive": post.over_18, # 将 NSFW 映射为 sensitive
-        "spoilerText": "Spoiler" if post.spoiler else "", # 将剧透标记转换为文本
-        "language": None, # Reddit API 不直接提供帖子语言
-        "visibility": "public", # Reddit 帖子通常是公开的
         "favouritesCount": post.score, # 使用 score 作为点赞数的近似值
-        "reblogsCount": post.num_crossposts, # 使用 crossposts 作为转发数的近似值
         "repliesCount": post.num_comments,
         "tags": tags,
         "url": f"https://www.reddit.com{post.permalink}", # 帖子的 Reddit 链接
@@ -400,10 +381,12 @@ def convert_reddit_post_to_target_format(post: praw.models.Submission):
     }
 
     return {
-        "platform": "Reddit",
-        "version": 1.0,
+        "platform": "Reddit",   # 平台名称
+        "version": 1.1,         # 版本号
         "fetchedAt": fetched_at,
-        "sentiment": None, # 初始为 null
+        "sentiment": None,      # 初始为 null
+        "sentimentLabel": None, # 新增字段，初始为 null
+        "keywords": None,       # 新增字段，初始为 null (提取逻辑不在此函数)
         "data": data
     }
 
@@ -417,7 +400,7 @@ if __name__ == "__main__":
         # --- 示例 1: 获取指定 Subreddit 的最新帖子 ---
         print("\n--- 示例 1: 获取 r/trump 的最新帖子 ---")
         latest_python_posts = get_subreddit_posts(reddit, 'trump', sort='new', limit=1) # 只获取 1 个用于演示
-        if latest_python_posts:
+        if (latest_python_posts):
             post = latest_python_posts[0]
             print("\n原始结构 (来自 format_post_data):")
             original_data = format_post_data(post)
@@ -438,8 +421,8 @@ if __name__ == "__main__":
             print(f"  - [{post_data['subreddit']}] {post_data['title']} (Score: {post_data['score']})")
 
         # --- 示例 3: 获取帖子的评论 ---
-        if latest_python_posts:
-            target_post = latest_python_posts[0] # 获取第一篇帖子的评论
+        if search_results:
+            target_post = search_results[0] # 获取第一篇帖子的评论
             print(f"\n--- 示例 3: 获取帖子 '{target_post.title}' 的顶级评论 ---")
             comments = get_post_comments(target_post, limit=5, depth=1) # 获取最多5条顶级评论
             print(f"帖子总评论数: {target_post.num_comments}") # 显示帖子实际评论数
@@ -458,7 +441,7 @@ if __name__ == "__main__":
             print(f"  - 随机帖子: [{post_data['subreddit']}] {post_data['title']}")
 
         # --- 示例 5: 按 Flair 和时间范围过滤 ---
-        print("\n--- 示例 5: 获取 r/trump 过去一天内的热门帖子并检查各种Flair ---")
+        print("\n--- 示例 5: 获取 r/trump 过去一天内的热门帖子并检查各种Flair/Tag ---")
         now_utc = time.time()
         one_day_ago_utc = now_utc - (24 * 60 * 60)
         hot_posts = get_subreddit_posts(
@@ -469,14 +452,14 @@ if __name__ == "__main__":
         for post in hot_posts:
             flair = post.link_flair_text
             if flair: flairs[flair] = flairs.get(flair, 0) + 1
-        print(f"过去一天内发现的Flair类型: {flairs if flairs else '无'}")
+        print(f"过去一天内发现的Flair/Tag类型: {flairs if flairs else '无'}")
         if flairs:
             most_common_flair = max(flairs.items(), key=lambda x: x[1])[0]
-            print(f"\n使用最常见的Flair '{most_common_flair}' 进行过滤:")
+            print(f"\n使用最常见的Flair/Tag '{most_common_flair}' 进行过滤:")
             filtered_posts = [p for p in hot_posts if p.link_flair_text == most_common_flair]
             for post in filtered_posts:
                 post_data = format_post_data(post)
-                print(f"  - [{post_data['subreddit']}] {post_data['title']} (Flair: {post_data['flair']}, Created: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(post_data['created_utc']))} UTC)")
+                print(f"  - [{post_data['subreddit']}] {post_data['title']} (Flair/Tag: {post_data['flair']}, Created: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(post_data['created_utc']))} UTC)")
 
 
         # --- 关于定时抓取 ---
