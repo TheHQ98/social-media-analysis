@@ -6,7 +6,7 @@
 
 ```bash
 
-fission package create --spec --name mastodon_harvester \
+fission package create --spec --name mastodon-harvester \
 	--source ./functions/mastodon_harvester/__init__.py \
 	--source ./functions/mastodon_harvester/mastodon_harvester.py \
 	--source ./functions/mastodon_harvester/requirements.txt \
@@ -14,11 +14,11 @@ fission package create --spec --name mastodon_harvester \
 	--env python39x \
 	--buildcmd './build.sh'
 
-fission function create --spec --name mastodon_harvester \
-    --pkg mastodon_harvester \
+fission function create --spec --name mastodon-harvester \
+    --pkg mastodon-harvester \
     --env python39x \
     --configmap masto-config \
-    --entrypoint "mastodonApi.main"
+    --entrypoint "mastodon_harvester.main"
 
 
 fission package create --spec --name addes \
@@ -35,24 +35,24 @@ fission function create --spec --name addes \
   --entrypoint "addes.main"
 
 fission timer create --spec \
-	--name mastodon_harvester-api \
-	--function mastodon_harvester \
-	--cron "@every 30s"
+	--name mastodon-harvester \
+	--function mastodon-harvester \
+	--cron "@every 20s"
 
 fission httptrigger create --spec \
-	--name mastodon_harvester-trigger \
+	--name mastodon-harvester-trigger \
 	--url "/mastodon" \
 	--method GET \
-	--function mastodon_harvester
+	--function mastodon-harvester
 
-fission mqtrigger create --spec --name mastodon_harvester-addes \
+fission mqtrigger create --spec --name mastodon-addes \
   --function addes \
   --mqtype redis \
   --mqtkind keda \
-  --topic mastodon_harvester \
+  --topic mastodon \
   --errortopic errors \
   --maxretries 3 \
   --metadata address=redis-headless.redis.svc.cluster.local:6379 \
   --metadata listLength=100 \
-  --metadata listName=mastodon_harvester
+  --metadata listName=mastodon
 ```
