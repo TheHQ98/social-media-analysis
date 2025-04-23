@@ -8,12 +8,14 @@ LIMIT = 40
 YEARS = 3
 TAG = "afl"
 
+CONFIG_MAP = "masto-config"
+
 
 def config(k: str) -> str:
     """
-    Reads configuration from masto-config file
+    Reads configuration from config map file
     """
-    with open(f'/configs/default/masto-config/{k}', 'r') as f:
+    with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
         return f.read()
 
 

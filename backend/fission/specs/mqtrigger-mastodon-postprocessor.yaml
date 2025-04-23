@@ -2,7 +2,7 @@ apiVersion: fission.io/v1
 kind: MessageQueueTrigger
 metadata:
   creationTimestamp: null
-  name: post-processor
+  name: mastodon-postprocessor
 spec:
   contentType: application/json
   cooldownPeriod: 300
