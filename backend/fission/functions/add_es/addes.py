@@ -184,8 +184,8 @@ def main() -> str:
                 body=record,
                 op_type='create'
             )
-            current_app.logger.info(f"A record sent to ES successfully")
-        except ConflictError:
-            current_app.logger.info(f"An error happened while send to ES: {ConflictError}")
+            current_app.logger.info(f"{platform}_{post_id} sent to ES successfully")
+        except ConflictError as e:
+            current_app.logger.error(f"An error happened while send to ES: {e}")
 
     return "OK"
