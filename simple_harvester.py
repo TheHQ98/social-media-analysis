@@ -37,8 +37,8 @@ def fetch_post_data(item):
             "createdAt": (
                     datetime.utcfromtimestamp(author.created_utc).isoformat() + "Z"
             ) if author and hasattr(author, "created_utc") else None,
-            "followersCount": getattr(author, "link_karma", None),
-            "followingCount": getattr(author, "comment_karma", None),
+            "followersCount/linkKarma": getattr(author, "link_karma", None),
+            "followingCount/commentKarma": getattr(author, "comment_karma", None),
             "statusesCount": None,
             "bot": False,
             "note": None
