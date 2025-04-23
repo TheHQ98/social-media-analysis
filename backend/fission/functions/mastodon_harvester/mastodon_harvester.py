@@ -1,4 +1,3 @@
-import json
 import time
 from datetime import datetime, timedelta, timezone
 from mastodon import Mastodon
@@ -7,7 +6,7 @@ from flask import current_app
 
 LIMIT = 40
 YEARS = 3
-TAG = "trump"
+TAG = "afl"
 
 
 def config(k: str) -> str:
@@ -24,11 +23,7 @@ def fetch_post_data(post):
         "createdAt": post.get("created_at").isoformat() + "Z" if post.get("created_at") else None,
         "content": post.get("content"),
         "sensitive": post.get("sensitive", False),
-        "spoilerText": post.get("spoiler_text", ""),
-        "language": post.get("language"),
-        "visibility": post.get("visibility", "public"),
         "favouritesCount": post.get("favourites_count", 0),
-        "reblogsCount": post.get("reblogs_count", 0),
         "repliesCount": post.get("replies_count", 0),
         "tags": [t["name"] for t in post.get("tags", [])],
         "url": post.get("url"),
@@ -36,23 +31,20 @@ def fetch_post_data(post):
         "account": {
             "id": post["account"].get("id"),
             "username": post["account"].get("username"),
-            "acct": post["account"].get("acct"),
-            "displayName": post["account"].get("display_name"),
             "createdAt": post["account"]["created_at"].isoformat() + "Z"
             if post["account"].get("created_at") else None,
-            "followersCount": post["account"].get("followers_count", 0),
-            "followingCount": post["account"].get("following_count", 0),
-            "statusesCount": post["account"].get("statuses_count", 0),
-            "bot": post["account"].get("bot"),
-            "note": post["account"].get("note", "")
+            "followersCount/linkKarma": post["account"].get("followers_count", 0),
+            "followingCount/commentKarma": post["account"].get("following_count", 0)
         }
     }
 
     return {
         "platform": "Mastodon",
-        "version": 1.0,
+        "version": 1.1,
         "fetchedAt": datetime.utcnow().isoformat() + "Z",
         "sentiment": None,
+        "sentimentLabel": None,
+        "keywords": [],
         "data": data
     }
 

@@ -6,7 +6,7 @@ metadata:
 spec:
   contentType: application/json
   cooldownPeriod: 300
-  errorTopic: errors
+  errorTopic: post_mastodon_errors
   functionref:
     functionweights: null
     name: post-processor

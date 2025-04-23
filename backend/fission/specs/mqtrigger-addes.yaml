@@ -2,11 +2,11 @@ apiVersion: fission.io/v1
 kind: MessageQueueTrigger
 metadata:
   creationTimestamp: null
-  name: mastodon-addes
+  name: addes
 spec:
   contentType: application/json
   cooldownPeriod: 300
-  errorTopic: errors
+  errorTopic: addes_errors
   functionref:
     functionweights: null
     name: addes
