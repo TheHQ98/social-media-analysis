@@ -2,7 +2,7 @@
 
 
 
-## install mastodon script
+## mastodon script yaml file
 
 ```bash
 fission package create --spec --name mastodon-harvester \
@@ -18,7 +18,16 @@ fission function create --spec --name mastodon-harvester \
     --env python39x \
     --configmap masto-config \
     --entrypoint "mastodon_harvester.main"
+    
+fission timer create --spec \
+	--name mastodon-harvester \
+	--function mastodon-harvester \
+	--cron "@every 20s"
+```
 
+## post-processor yaml file
+
+```bash
 fission package create --spec --name post-processor \
 	--source ./functions/post_processor/__init__.py \
 	--source ./functions/post_processor/post_processor.py \
@@ -32,6 +41,22 @@ fission function create --spec --name post-processor \
     --env python39x \
     --entrypoint "post_processor.main"
 
+fission mqtrigger create --spec --name post-processor \
+  --function post-processor \
+  --mqtype redis \
+  --mqtkind keda \
+  --topic mastodon \
+  --errortopic post_mastodon_errors \
+  --maxretries 3 \
+  --metadata address=redis-headless.redis.svc.cluster.local:6379 \
+  --metadata listLength=100 \
+  --metadata listName=mastodon
+
+```
+
+## addes yaml file
+
+```bash
 fission package create --spec --name addes \
 	--source ./functions/add_es/__init__.py \
 	--source ./functions/add_es/addes.py \
@@ -45,34 +70,12 @@ fission function create --spec --name addes \
   --env python \
   --entrypoint "addes.main"
 
-fission timer create --spec \
-	--name mastodon-harvester \
-	--function mastodon-harvester \
-	--cron "@every 20s"
-
-fission httptrigger create --spec \
-	--name mastodon-harvester-trigger \
-	--url "/mastodon" \
-	--method GET \
-	--function mastodon-harvester
-
-fission mqtrigger create --spec --name post-processor \
-  --function post-processor \
-  --mqtype redis \
-  --mqtkind keda \
-  --topic mastodon \
-  --errortopic errors \
-  --maxretries 3 \
-  --metadata address=redis-headless.redis.svc.cluster.local:6379 \
-  --metadata listLength=100 \
-  --metadata listName=mastodon
-
-fission mqtrigger create --spec --name mastodon-addes \
+fission mqtrigger create --spec --name addes \
   --function addes \
   --mqtype redis \
   --mqtkind keda \
   --topic elastic \
-  --errortopic errors \
+  --errortopic addes_errors \
   --maxretries 3 \
   --metadata address=redis-headless.redis.svc.cluster.local:6379 \
   --metadata listLength=100 \
