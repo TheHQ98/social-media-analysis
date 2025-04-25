@@ -10,7 +10,7 @@ load_dotenv()
 TAGS = ["melbourne", "sydney", "brisbane", "adelaide", "perth", "hobart", "darwin", "canberra"]
 LIMIT = 40
 MAX_TOTAL = 2000
-SAVE_FILE = "aus_cost_of_living_random.json"
+SAVE_FILE = "aus_cost_of_living_random_nodup.json"
 
 def config(k: str) -> str:
     value = os.getenv(k)
@@ -75,6 +75,7 @@ def main():
 
     total = 0
     collected = []
+    seen_ids = set()
 
     while total < MAX_TOTAL:
         selected_tag = random.choice(TAGS)
@@ -83,23 +84,31 @@ def main():
         try:
             posts = mastodon.timeline_hashtag(selected_tag, limit=LIMIT)
         except Exception as e:
-            print(f"[ERROR] API failed for #{selected_tag}: {e}")
+            print(f"API failed for #{selected_tag}: {e}")
             time.sleep(3)
             continue
 
         if not posts:
-            print(f"⚠️ No posts found for #{selected_tag}")
+            print(f"No posts found for #{selected_tag}")
             continue
 
-        batch = [fetch_post_data(post, selected_tag) for post in posts]
-        collected.extend(batch)
-        total += len(batch)
-        print(f"Collected {len(batch)} posts (Total: {total})")
+        batch = []
+        for post in posts:
+            post_id = post["id"]
+            if post_id in seen_ids:
+                continue
+            seen_ids.add(post_id)
+            batch.append(fetch_post_data(post, selected_tag))
+
+        if batch:
+            collected.extend(batch)
+            total += len(batch)
+            print(f"Collected {len(batch)} new posts (Total: {total})")
 
         time.sleep(1)
 
     append_posts_to_file(collected, SAVE_FILE)
-    print(f"Finished! Total {total} posts saved to {SAVE_FILE}")
+    print(f"🎉 Finished! Total {total} unique posts saved to {SAVE_FILE}")
 
 if __name__ == "__main__":
     main()
