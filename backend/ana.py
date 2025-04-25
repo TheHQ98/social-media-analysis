@@ -5,12 +5,16 @@ import random
 from datetime import datetime, timezone
 from mastodon import Mastodon
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
+from keybert import KeyBERT
 
 load_dotenv()
 TAGS = ["melbourne", "sydney", "brisbane", "adelaide", "perth", "hobart", "darwin", "canberra"]
 LIMIT = 40
-MAX_TOTAL = 2000
-SAVE_FILE = "aus_cost_of_living_random_nodup.json"
+MAX_TOTAL = 100
+SAVE_FILE = "aus_cost_of_living_random_keywords.json"
+
+kw_model = KeyBERT()
 
 def config(k: str) -> str:
     value = os.getenv(k)
@@ -18,14 +22,23 @@ def config(k: str) -> str:
         raise ValueError(f"Missing config: {k}")
     return value.strip()
 
+def clean_text(text):
+    return BeautifulSoup(text or "", "html.parser").get_text()
+
+def extract_keywords(text, top_n=4):
+    keyphrases = kw_model.extract_keywords(text, top_n=top_n, stop_words='english')
+    return [kw[0] for kw in keyphrases]
+
 def fetch_post_data(post, selected_tag):
+    content = clean_text(post.get("content", ""))
+    keywords = extract_keywords(content, top_n=4)
     return {
         "platform": "Mastodon",
         "version": 1.1,
         "fetchedAt": datetime.utcnow().isoformat() + "Z",
         "sentiment": None,
         "sentimentLabel": None,
-        "keywords": [selected_tag] + [t["name"] for t in post.get("tags", [])],
+        "keywords": keywords,
         "data": {
             "id": post.get("id"),
             "createdAt": post.get("created_at").isoformat() + "Z" if post.get("created_at") else None,
@@ -52,6 +65,8 @@ def fetch_post_data(post, selected_tag):
     }
 
 def append_posts_to_file(posts, file_path):
+    os.makedirs(os.path.dirname(file_path) or ".", exist_ok=True)
+
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             existing = json.load(f)
@@ -62,6 +77,10 @@ def append_posts_to_file(posts, file_path):
 
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(existing, f, ensure_ascii=False, indent=2)
+
+    print(f"Saved {len(posts)} posts to {file_path}")
+
+
 
 def main():
     access_token = config('ACCESS_TOKEN')
@@ -108,7 +127,7 @@ def main():
         time.sleep(1)
 
     append_posts_to_file(collected, SAVE_FILE)
-    print(f"🎉 Finished! Total {total} unique posts saved to {SAVE_FILE}")
+    print(f"Finished! Total {total} unique posts saved to {SAVE_FILE}")
 
 if __name__ == "__main__":
     main()
