@@ -7,13 +7,16 @@ from mastodon import Mastodon
 from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 from keybert import KeyBERT
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
+
 
 load_dotenv()
 TAGS = ["melbourne", "sydney", "brisbane", "adelaide", "perth", "hobart", "darwin", "canberra"]
 LIMIT = 40
-MAX_TOTAL = 100
+MAX_TOTAL = 2000
 SAVE_FILE = "aus_cost_of_living_random_keywords.json"
-
+analyzer = SentimentIntensityAnalyzer()
 kw_model = KeyBERT()
 
 def config(k: str) -> str:
@@ -30,19 +33,31 @@ def extract_keywords(text, top_n=4):
     return [kw[0] for kw in keyphrases]
 
 def fetch_post_data(post, selected_tag):
-    content = clean_text(post.get("content", ""))
+    content_raw = post.get("content", "")
+    content = clean_text(content_raw)
+
     keywords = extract_keywords(content, top_n=4)
+
+    score = analyzer.polarity_scores(content)
+    compound = round(score['compound'], 3)
+    if compound >= 0.5:
+        sentiment_label = "positive"
+    elif compound <= -0.5:
+        sentiment_label = "negative"
+    else:
+        sentiment_label = "neutral"
+
     return {
         "platform": "Mastodon",
         "version": 1.1,
         "fetchedAt": datetime.utcnow().isoformat() + "Z",
-        "sentiment": None,
-        "sentimentLabel": None,
+        "sentiment": compound,
+        "sentimentLabel": sentiment_label,
         "keywords": keywords,
         "data": {
             "id": post.get("id"),
             "createdAt": post.get("created_at").isoformat() + "Z" if post.get("created_at") else None,
-            "content": post.get("content"),
+            "content": content_raw,
             "sensitive": post.get("sensitive", False),
             "favouritesCount": post.get("favourites_count", 0),
             "reblogsCount": post.get("reblogs_count", 0),
@@ -63,6 +78,7 @@ def fetch_post_data(post, selected_tag):
             }
         }
     }
+
 
 def append_posts_to_file(posts, file_path):
     os.makedirs(os.path.dirname(file_path) or ".", exist_ok=True)
@@ -120,9 +136,10 @@ def main():
             batch.append(fetch_post_data(post, selected_tag))
 
         if batch:
-            collected.extend(batch)
+            append_posts_to_file(batch, SAVE_FILE)
             total += len(batch)
-            print(f"Collected {len(batch)} new posts (Total: {total})")
+            print(f"Saved {len(batch)} new posts (Total: {total})")
+
 
         time.sleep(1)
 
