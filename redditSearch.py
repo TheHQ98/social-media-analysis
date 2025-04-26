@@ -1,9 +1,10 @@
 import praw
 import os
 import sys
+import json
 import time
 import random
-from datetime import datetime, timezone # 新增导入
+from datetime import datetime, timezone
 
 # --- Reddit 初始化 ---
 
@@ -412,20 +413,40 @@ if __name__ == "__main__":
     if reddit:
         # --- 示例 1: 获取指定 Subreddit 的最新帖子 ---
         print("\n--- 示例 1: 获取 r/melbourne 的最新帖子 ---")
-        for subreddit in allowed_subreddits:
-            latest_python_posts = get_subreddit_posts(reddit, subreddit, sort='new', limit=3) # 只获取3个用于演示
-            if (latest_python_posts):
-                post = latest_python_posts[0] # 只print1个
-                # print("\n原始结构 (来自 format_post_data):")
-                original_data = format_post_data(post)
-                import json # 导入 json 库以便更好地打印字典
-                # print(json.dumps(original_data, indent=2, ensure_ascii=False))
+        # 设定停止的最早时间点
+        stop_timestamp = datetime.strptime("2023-01-01", "%Y-%m-%d").timestamp()
 
-                print("\n转换后的目标结构:")
-                converted_data = convert_reddit_post_to_target_format(post)
-                print(json.dumps(converted_data, indent=2, ensure_ascii=False))
-            else:
-                print("未能获取到帖子。")
+        for subreddit in allowed_subreddits:
+            print(f"\n开始抓取 r/{subreddit}...")
+            finished = False
+            total_posts = 0
+            while not finished:
+                latest_python_posts = get_subreddit_posts(reddit, subreddit, sort='new', limit=500)
+                if latest_python_posts:
+                    for post in latest_python_posts:
+                        original_data = format_post_data(post)
+                        print("\n转换后的目标结构:")
+                        converted_data = convert_reddit_post_to_target_format(post)
+                        print(json.dumps(converted_data, indent=2, ensure_ascii=False))
+                    total_posts += len(latest_python_posts)
+
+                    # 检查发布时间
+                    earliest_post = min(latest_python_posts, key=lambda x: x.created_utc)
+
+                    if len(latest_python_posts) < 500:
+                        print(f"r/{subreddit} 本轮未满500，实际抓到 {len(latest_python_posts)} 条，停止抓取。")
+                        finished = True
+                    elif earliest_post.created_utc < stop_timestamp:
+                        print(f"r/{subreddit} 抓取到 2023/1/1 之前的帖子，停止抓取。")
+                        finished = True
+                    else:
+                        print(f"r/{subreddit} 本轮抓满500条，继续下一轮抓取...")
+                else:
+                    print(f"r/{subreddit} 未能抓到帖子，提前停止。")
+                    finished = True
+
+            print(f"完成 r/{subreddit} 的抓取，总共抓取了 {total_posts} 条帖子。")
+            time.sleep(2)  # 防止频率过高
 
         '''
         # --- 示例 2: 搜索包含特定关键词的帖子 ---
@@ -434,7 +455,6 @@ if __name__ == "__main__":
         for post in search_results:
             post_data = format_post_data(post)
             print(f"  - [{post_data['subreddit']}] {post_data['title']} (Score: {post_data['score']})")
-        '''
 
         # --- 示例 3: 获取帖子的评论 ---
         if search_results:
@@ -449,7 +469,6 @@ if __name__ == "__main__":
         else:
             print("\n--- 示例 3: 跳过，因为没有获取到帖子 ---")
 
-        '''
         # --- 示例 4: 获取随机帖子 ---
         print("\n--- 示例 4: 获取 r/melbourne 的随机帖子 ---")
         random_post = get_random_post(reddit, 'melbourne')
