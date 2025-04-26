@@ -2,7 +2,7 @@ apiVersion: fission.io/v1
 kind: Function
 metadata:
   creationTimestamp: null
-  name: post-processor
+  name: mastodon-harvester-tag
 spec:
   InvokeStrategy:
     ExecutionStrategy:
@@ -13,15 +13,18 @@ spec:
       TargetCPUPercent: 0
     StrategyType: execution
   concurrency: 500
+  configmaps:
+  - name: masto-config
+    namespace: ""
   environment:
     name: python39x
     namespace: ""
   functionTimeout: 60
   idletimeout: 120
   package:
-    functionName: post_processor.main
+    functionName: mastodon_harvester_tag.main
     packageref:
-      name: post-processor
+      name: mastodon-harvester-tag
       namespace: ""
   requestsPerPod: 1
   resources: {}

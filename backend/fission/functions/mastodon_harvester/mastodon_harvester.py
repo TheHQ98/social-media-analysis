@@ -1,5 +1,4 @@
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from mastodon import Mastodon
 import requests
 from flask import current_app
@@ -61,7 +60,6 @@ def fetch_posts(limit):
     )
 
     posts = mastodon.timeline_public(limit=limit)
-    # posts = mastodon.timeline_hashtag("AFL", limit=limit, local=True)
     results = []
 
     for post in posts:
@@ -70,54 +68,9 @@ def fetch_posts(limit):
     return results
 
 
-def fetch_tags_and_send_posts():
-    access_token = config('ACCESS_TOKEN')
-    api_base = config('API_BASE_URL')
-
-    mastodon = Mastodon(
-        access_token=access_token,
-        api_base_url=api_base
-    )
-
-    cutoff = datetime.now(timezone.utc) - timedelta(days=YEARS * 365)
-    max_id = None
-    sent = 0
-
-    while True:
-        posts = mastodon.timeline_hashtag(
-            TAG,
-            limit=40,
-            max_id=max_id
-        )
-
-        if not posts:
-            break
-
-        for post in posts:
-            if post["created_at"] < cutoff:
-                return
-
-            doc = fetch_post_data(post)
-
-            try:
-                res = requests.post(
-                    url="http://router.fission.svc.cluster.local/enqueue/mastodon",
-                    json=doc,
-                    timeout=5
-                )
-                sent += 1
-
-            except Exception as e:
-                current_app.logger.error(f"Error pushing to queue: {e}")
-
-        max_id = int(posts[-1]["id"]) - 1
-        time.sleep(0.5)
-
-
 def main():
     # fetch number of limit post
     posts = fetch_posts(limit=LIMIT)
-    # fetch_tags_and_send_posts()
 
     # send to enqueue/mastodon
     for post in posts:
