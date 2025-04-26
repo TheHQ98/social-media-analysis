@@ -132,14 +132,6 @@ def search_posts(reddit_instance, query, subreddit_name=None, sort='relevance', 
     Returns:
         list[praw.models.Submission]: 符合条件的 Reddit 帖子对象列表。
     """
-    # 设置subreddit范围
-    allowed_subreddits = [
-        "AskAnAustralian", "australia", "MovingToBrisbane", "australian", "AustraliaTravel", "AusFinance","CarsAustralia", 
-        "AusEcon", "AustralianPolitics", "AusProperty", "AusPropertyChat", "howislivingthere", "tasmania", "perth", 
-        "adelaide", "brisbane", "melbourne", "sydney", "canberra", "darwin", "WesternAustralia", "AussieMaps", "southaustralia", 
-        "woolworths"
-    ]
-
     posts = []
     try:
         search_target = reddit_instance.subreddit(subreddit_name) if subreddit_name else reddit_instance.subreddit('all')
@@ -406,34 +398,43 @@ def convert_reddit_post_to_target_format(post: praw.models.Submission):
 
 # --- 示例用法与定时抓取说明 ---
 if __name__ == "__main__":
+    # 设置subreddit范围
+    allowed_subreddits = [
+        "AskAnAustralian", "australia", "MovingToBrisbane", "australian", "AustraliaTravel", "AusFinance","CarsAustralia", 
+        "AusEcon", "AustralianPolitics", "AusProperty", "AusPropertyChat", "howislivingthere", "tasmania", "perth", 
+        "adelaide", "brisbane", "melbourne", "sydney", "canberra", "darwin", "WesternAustralia", "AussieMaps", "southaustralia", 
+        "woolworths"
+    ]
+
     # 1. 初始化 Reddit 连接
     reddit = initialize_reddit()
 
     if reddit:
-        '''
         # --- 示例 1: 获取指定 Subreddit 的最新帖子 ---
         print("\n--- 示例 1: 获取 r/melbourne 的最新帖子 ---")
-        latest_python_posts = get_subreddit_posts(reddit, 'melbourne', sort='new', limit=5) # 只获取5个用于演示
-        if (latest_python_posts):
-            post = latest_python_posts[0] # 只print1个
-            print("\n原始结构 (来自 format_post_data):")
-            original_data = format_post_data(post)
-            import json # 导入 json 库以便更好地打印字典
-            print(json.dumps(original_data, indent=2, ensure_ascii=False))
+        for subreddit in allowed_subreddits:
+            latest_python_posts = get_subreddit_posts(reddit, subreddit, sort='new', limit=3) # 只获取3个用于演示
+            if (latest_python_posts):
+                post = latest_python_posts[0] # 只print1个
+                # print("\n原始结构 (来自 format_post_data):")
+                original_data = format_post_data(post)
+                import json # 导入 json 库以便更好地打印字典
+                # print(json.dumps(original_data, indent=2, ensure_ascii=False))
 
-            print("\n转换后的目标结构:")
-            converted_data = convert_reddit_post_to_target_format(post)
-            print(json.dumps(converted_data, indent=2, ensure_ascii=False))
-        else:
-            print("未能获取到帖子。")
+                print("\n转换后的目标结构:")
+                converted_data = convert_reddit_post_to_target_format(post)
+                print(json.dumps(converted_data, indent=2, ensure_ascii=False))
+            else:
+                print("未能获取到帖子。")
+
         '''
-
         # --- 示例 2: 搜索包含特定关键词的帖子 ---
         print("\n--- 示例 2: 搜索包含 'kmart' 的帖子 ---")
         search_results = search_posts(reddit, query='kmart', sort='new', time_filter='all', limit=2000, start_time = int(datetime.strptime("2023-01-01", "%Y-%m-%d").timestamp()))
         for post in search_results:
             post_data = format_post_data(post)
             print(f"  - [{post_data['subreddit']}] {post_data['title']} (Score: {post_data['score']})")
+        '''
 
         # --- 示例 3: 获取帖子的评论 ---
         if search_results:
