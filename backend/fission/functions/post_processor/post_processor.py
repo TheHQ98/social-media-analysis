@@ -82,7 +82,8 @@ def main():
         record["sentimentLabel"] = sentiment_label
 
         # find out top 5 keywords from post context
-        record["keywords"] = extract_keywords(clean_content)
+        record["keywords"] = extract_keywords(clean_content.lower())
+        assert all(k == k.lower() for k in record["keywords"]), "Contain upper words"
 
         # send to redis list, called elastic
         try:
