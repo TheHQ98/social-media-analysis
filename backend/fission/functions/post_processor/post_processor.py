@@ -1,3 +1,11 @@
+"""
+get data from redis list,
+produce sentiment, sentiment label and keywords from the context,
+finally, send to back to redis list named elastic, we only process English context, otherwise drop it
+
+Sentiment value used by VADER, Key word extractor used by YAKE
+"""
+
 from bs4 import BeautifulSoup
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import yake

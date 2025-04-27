@@ -2,7 +2,7 @@
 
 
 
-## mastodon script yaml file
+## mastodon (fetch by timeline_public) script yaml file
 
 ```bash
 fission package create --spec --name mastodon-harvester \
@@ -25,7 +25,32 @@ fission timer create --spec \
 	--cron "@every 20s"
 ```
 
-## post-processor yaml file
+## mastodon by fetch tag (fetch by timeline_hashtag) script yaml file
+Note: program takes the tags from the Redis list called `mastodon:tags` and crawls them in order.
+
+```bash
+
+fission package create --spec --name mastodon-harvester-tag \
+	--source ./functions/mastodon_harvester_tag/__init__.py \
+	--source ./functions/mastodon_harvester_tag/mastodon_harvester_tag.py \
+	--source ./functions/mastodon_harvester_tag/requirements.txt \
+	--source ./functions/mastodon_harvester_tag/build.sh \
+	--env python39x \
+	--buildcmd './build.sh'
+
+fission function create --spec --name mastodon-harvester-tag \
+    --pkg mastodon-harvester-tag \
+    --env python39x \
+    --configmap masto-config \
+    --entrypoint "mastodon_harvester_tag.main"
+
+fission timer create --spec \
+	--name mastodon-harvester-tag \
+	--function mastodon-harvester-tag \
+	--cron "@every 30s"
+```
+
+## mastodon post-processor yaml file
 
 ```bash
 fission package create --spec --name post-processor \
@@ -41,7 +66,7 @@ fission function create --spec --name post-processor \
     --env python39x \
     --entrypoint "post_processor.main"
 
-fission mqtrigger create --spec --name post-processor \
+fission mqtrigger create --spec --name mastodon-postprocessor \
   --function post-processor \
   --mqtype redis \
   --mqtkind keda \
@@ -67,7 +92,8 @@ fission package create --spec --name addes \
 
 fission function create --spec --name addes \
   --pkg addes \
-  --env python \
+  --env python39x \
+  --configmap shared-data \
   --entrypoint "addes.main"
 
 fission mqtrigger create --spec --name addes \
