@@ -4,14 +4,13 @@ import requests
 from flask import current_app
 import redis
 
-TAG = "sydney"
+REDIS_TAGS_LIST = "mastodon:tags"
 
 LIMIT = 40
 END_DATE = datetime(2023, 1, 1, tzinfo=timezone.utc)
 CONFIG_MAP = "masto-config"
 REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
-REDIS_KEY = f"mastodon:max_id:{TAG}"
 QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/mastodon"
 
 
@@ -57,7 +56,14 @@ def fetch_post_data(post):
 
 def fetch_tags_and_send_posts():
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
-    max_id_str = r.get(REDIS_KEY)
+
+    tag = r.lindex(REDIS_TAGS_LIST, 0)
+    if not tag:
+        current_app.logger.warning("No more tags in Redis list.")
+        return
+
+    redis_key = f"mastodon:max_id:{tag}"
+    max_id_str = r.get(redis_key)
     if max_id_str:
         max_id = int(max_id_str)
     else:
@@ -74,18 +80,18 @@ def fetch_tags_and_send_posts():
 
     try:
         posts = mastodon.timeline_hashtag(
-            TAG,
+            tag,
             limit=LIMIT,
             max_id=max_id,
             remote=True,
         )
     except MastodonNetworkError as e:
         current_app.logger.error(f"Mastodon Network Error：{e}")
-        return "NetworkError"
+        return
 
     if not posts:
         current_app.logger.warning("No more posts!")
-        return "NoData"
+        return
 
     for record in posts:
         post = fetch_post_data(record)
@@ -96,8 +102,9 @@ def fetch_tags_and_send_posts():
         ).date() if created_str else None
 
         if created_dt and created_dt < END_DATE.date():
-            current_app.logger.warning("touched END_DATE!")
-            return "ReachedEndDate"
+            r.lpop(REDIS_TAGS_LIST)
+            current_app.logger.warning(f"touched END_DATE! Removed {tag} from Redis.")
+            return
 
         try:
             requests.post(QUEUE_ENDPOINT, json=post, timeout=5)
@@ -105,7 +112,7 @@ def fetch_tags_and_send_posts():
             current_app.logger.error(f"Error pushing to queue：{e}")
 
     new_max_id = int(posts[-1]["id"]) - 1
-    r.set(REDIS_KEY, new_max_id)
+    r.set(redis_key, new_max_id)
     current_app.logger.info(f"Updated new max_id={new_max_id}")
 
     return
@@ -114,7 +121,7 @@ def fetch_tags_and_send_posts():
 def main():
     fetch_tags_and_send_posts()
 
-    return f"OK: fetched mastodon posts from {TAG}"
+    return "OK"
 
 
 if __name__ == "__main__":

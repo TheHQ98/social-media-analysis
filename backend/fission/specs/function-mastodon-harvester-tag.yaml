@@ -1,0 +1,30 @@
+apiVersion: fission.io/v1
+kind: Function
+metadata:
+  creationTimestamp: null
+  name: mastodon-harvester-tag
+spec:
+  InvokeStrategy:
+    ExecutionStrategy:
+      ExecutorType: poolmgr
+      MaxScale: 0
+      MinScale: 0
+      SpecializationTimeout: 120
+      TargetCPUPercent: 0
+    StrategyType: execution
+  concurrency: 500
+  configmaps:
+  - name: masto-config
+    namespace: ""
+  environment:
+    name: python39x
+    namespace: ""
+  functionTimeout: 60
+  idletimeout: 120
+  package:
+    functionName: mastodon_harvester_tag.main
+    packageref:
+      name: mastodon-harvester-tag
+      namespace: ""
+  requestsPerPod: 1
+  resources: {}

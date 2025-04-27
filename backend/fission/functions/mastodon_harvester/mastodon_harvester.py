@@ -4,9 +4,6 @@ import requests
 from flask import current_app
 
 LIMIT = 40
-YEARS = 3
-TAG = "afl"
-
 CONFIG_MAP = "masto-config"
 
 
