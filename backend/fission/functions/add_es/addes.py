@@ -1,3 +1,8 @@
+"""
+Mainly used to send data to ElasticSearch from Redis List
+Only data that is structured correctly will end up being sent to ElasticSearch.
+"""
+
 from typing import Dict, Any, List
 from datetime import datetime
 from urllib.parse import urlparse
@@ -5,15 +10,23 @@ from elasticsearch8 import Elasticsearch
 from elasticsearch8.exceptions import ConflictError
 from flask import request, current_app
 
+CONFIG_MAP = "shared-data"
 ES_URL = "https://elasticsearch-master.elastic.svc.cluster.local:9200"
-ES_AUTH = ("elastic", "elastic")
+
+
+def config(k: str) -> str:
+    """
+    Reads configuration from config map file
+    """
+    with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
+        return f.read()
 
 
 def is_iso_datetime(time: str) -> bool:
     """
     Check is a legal ISO 8601 datetime string
-    :param time:
-    :return:
+    :param time: str
+    :return: bool
     """
     try:
         if time.endswith("Z"):
@@ -156,20 +169,23 @@ def legal_record(record: Dict[str, Any]) -> bool:
 
 def main() -> str:
     """
-    get data from redis list, and send to elasticsearch
+    get data from redis list, check the data structure and send to elasticsearch
     """
+    es_auth = (config('ES_USERNAME'), config('ES_PASSWORD'))
+
     es = Elasticsearch(
         ES_URL,
         verify_certs=False,
         ssl_show_warn=False,
-        basic_auth=ES_AUTH
+        basic_auth=es_auth
     )
 
+    # get data
     payload = request.get_json(force=True)
     records: List[Dict[str, Any]] = payload if isinstance(payload, list) else [payload]
-
     current_app.logger.info(f"Got {len(records)} record from queue")
 
+    # check each data structure, only validated data send to ES
     for record in records:
         if not legal_record(record):
             continue
@@ -177,6 +193,8 @@ def main() -> str:
         post_id = record["data"]["id"]
         platform = record["platform"].lower()
 
+        # ID is a combination of the platform name and post ID
+        # only if the data with this ID does not exist, otherwise skips it
         try:
             es.index(
                 index="socialplatform",

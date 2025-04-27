@@ -1,0 +1,11 @@
+apiVersion: fission.io/v1
+kind: TimeTrigger
+metadata:
+  creationTimestamp: null
+  name: mastodon-harvester
+spec:
+  cron: '@every 20s'
+  functionref:
+    functionweights: null
+    name: mastodon-harvester
+    type: name

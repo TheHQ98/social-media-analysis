@@ -1,3 +1,13 @@
+"""
+This program used to fetch posts by tag from mastodon.au and send the data to redis
+1. Through the timeline_hashtag continuously grab the latest posts up to specified END_DATA by
+specified TAG and paging
+2. Unify the formatting of each post to extract the key information
+3. Use Redis to record the max_id of each tag to achieve breakpoints
+4. When a tag backtracks to END_DATE, it automatically removed the current tag from the list,
+and switched to the next tag
+"""
+
 from datetime import datetime, timezone
 from mastodon import Mastodon, MastodonNetworkError
 import requests
@@ -23,6 +33,11 @@ def config(k: str) -> str:
 
 
 def fetch_post_data(post):
+    """
+        Process the raw data, only keep uniformly customised data structures
+        :param post: original post data
+        :return: processed post data struct
+    """
     data = {
         "id": post.get("id"),
         "createdAt": post.get("created_at").isoformat() + "Z" if post.get("created_at") else None,
@@ -57,11 +72,13 @@ def fetch_post_data(post):
 def fetch_tags_and_send_posts():
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
+    # get the tag from redis list, if no more tag in list, then top
     tag = r.lindex(REDIS_TAGS_LIST, 0)
     if not tag:
         current_app.logger.warning("No more tags in Redis list.")
         return
 
+    # get the last recorded max_id from redis list
     redis_key = f"mastodon:max_id:{tag}"
     max_id_str = r.get(redis_key)
     if max_id_str:
@@ -78,6 +95,7 @@ def fetch_tags_and_send_posts():
         request_timeout=30
     )
 
+    # fetch data from mastodon.au
     try:
         posts = mastodon.timeline_hashtag(
             tag,
@@ -90,9 +108,10 @@ def fetch_tags_and_send_posts():
         return
 
     if not posts:
-        current_app.logger.warning("No more posts!")
+        current_app.logger.warning("No more posts")
         return
 
+    # process raw data, and send to redis used by enqueue
     for record in posts:
         post = fetch_post_data(record)
 
@@ -101,9 +120,10 @@ def fetch_tags_and_send_posts():
             created_str.replace("Z", "")
         ).date() if created_str else None
 
+        # checking for exceeding the specified time
         if created_dt and created_dt < END_DATE.date():
             r.lpop(REDIS_TAGS_LIST)
-            current_app.logger.warning(f"touched END_DATE! Removed {tag} from Redis.")
+            current_app.logger.warning(f"Touched END_DATE. Removed {tag} from Redis.")
             return
 
         try:
@@ -111,6 +131,7 @@ def fetch_tags_and_send_posts():
         except Exception as e:
             current_app.logger.error(f"Error pushing to queue：{e}")
 
+    # updated max_id and send to redis
     new_max_id = int(posts[-1]["id"]) - 1
     r.set(redis_key, new_max_id)
     current_app.logger.info(f"Updated new max_id={new_max_id}")

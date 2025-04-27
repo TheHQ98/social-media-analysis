@@ -1,3 +1,9 @@
+"""
+Collect data from mastodon.au
+Using timeline_public, which means get the latest mastodon posts
+Finally, send the data to the enqueue/mastodon in redis
+"""
+
 from datetime import datetime
 from mastodon import Mastodon
 import requests
@@ -5,6 +11,7 @@ from flask import current_app
 
 LIMIT = 40
 CONFIG_MAP = "masto-config"
+QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/mastodon"
 
 
 def config(k: str) -> str:
@@ -16,6 +23,11 @@ def config(k: str) -> str:
 
 
 def fetch_post_data(post):
+    """
+    Process the raw data, only keep uniformly customised data structures
+    :param post: original post data
+    :return: processed post data struct
+    """
     data = {
         "id": post.get("id"),
         "createdAt": post.get("created_at").isoformat() + "Z" if post.get("created_at") else None,
@@ -48,6 +60,13 @@ def fetch_post_data(post):
 
 
 def fetch_posts(limit):
+    """
+    Get data from mastodon posts, and return processed data
+    :param limit: int, maximum number of posts to fetch that mastodon allowed at once
+    :return: list of mastodon posts
+    """
+
+    # get token and url from CONFIG_MAP
     access_token = config('ACCESS_TOKEN')
     api_base = config('API_BASE_URL')
 
@@ -69,11 +88,11 @@ def main():
     # fetch number of limit post
     posts = fetch_posts(limit=LIMIT)
 
-    # send to enqueue/mastodon
+    # send to enqueue/mastodon one by one
     for post in posts:
         try:
-            res = requests.post(
-                url="http://router.fission.svc.cluster.local/enqueue/mastodon",
+            requests.post(
+                url=QUEUE_ENDPOINT,
                 json=post,
                 timeout=5
             )
