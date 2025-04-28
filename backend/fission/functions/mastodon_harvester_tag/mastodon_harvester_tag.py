@@ -108,7 +108,8 @@ def fetch_tags_and_send_posts():
         return
 
     if not posts:
-        current_app.logger.warning("No more posts")
+        r.lpop(REDIS_TAGS_LIST)
+        current_app.logger.warning(f"No more posts, Removed {tag} from Redis.")
         return
 
     # process raw data, and send to redis used by enqueue
