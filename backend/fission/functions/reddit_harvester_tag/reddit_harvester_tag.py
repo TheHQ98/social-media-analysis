@@ -86,19 +86,21 @@ def convert_reddit_post_to_target_format(post: Submission) -> dict:
     created_at = datetime.fromtimestamp(post.created_utc, timezone.utc).isoformat(timespec="seconds") + "Z"
 
     if post.author:
+        author_id = getattr(post.author, "id", None)
+        author_username = getattr(post.author, "name", "[Unknown]")
         try:
             author_created = datetime.fromtimestamp(
                 post.author.created_utc, timezone.utc
             ).isoformat(timespec="seconds") + "Z"
-            link_karma = post.author.link_karma
-            comment_karma = post.author.comment_karma
+            link_karma = getattr(post.author, "link_karma", None)
+            comment_karma = getattr(post.author, "comment_karma", None)
         except (AttributeError, PrawcoreException):
-            author_created = None
-            link_karma = comment_karma = None
+            current_app.logger.info(f"[{post.id}] author info unavailable")
+            author_created = link_karma = comment_karma = None
 
         account_data = {
-            "id": post.author.id,
-            "username": post.author.name,
+            "id": author_id,
+            "username": author_username,
             "createdAt": author_created,
             "followersCount/linkKarma": link_karma,
             "followingCount/commentKarma": comment_karma,
@@ -183,9 +185,7 @@ def fetch_reddit_posts(reddit):
 def main():
     reddit = initialize_reddit()
 
-    print("开始")
     fetch_reddit_posts(reddit)
-    print("结束")
 
     return "OK"
 
