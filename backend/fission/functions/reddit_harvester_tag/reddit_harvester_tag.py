@@ -72,13 +72,13 @@ def initialize_reddit():
 
 
 # --- 新增：转换为目标 JSON 结构的函数 ---
-def convert_reddit_post_to_target_format(post: Submission) -> dict:
+def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> dict:
     """
     将 PRAW Submission 对象转换为指定的目标 JSON 结构。
 
     Args:
         post (praw.models.Submission): Reddit 帖子对象。
-
+        subreddit: current subreddit topic
     Returns:
         dict: 符合目标结构的字典。
     """
@@ -121,6 +121,9 @@ def convert_reddit_post_to_target_format(post: Submission) -> dict:
 
     # 处理 tags
     tags = [post.link_flair_text] if post.link_flair_text else []
+    if tags:
+        tags.append(subreddit.lower())
+        current_app.logger.info(f"Added {subreddit} into tags")
 
     data = {
         "id": post.id,
@@ -169,12 +172,12 @@ def fetch_reddit_posts(reddit):
         return
 
     for post in posts:
-        data = convert_reddit_post_to_target_format(post)
+        data = convert_reddit_post_to_target_format(post, subreddit)
         requests.post(QUEUE_ENDPOINT, json=data, timeout=5)
 
     oldest = min(posts, key=lambda p: p.created_utc)
     r.set(state_key, oldest.fullname)
-    current_app.logger.info(f"更新id成功")
+    current_app.logger.info(f"Update last_fullname")
 
     oldest_dt = datetime.fromtimestamp(oldest.created_utc, timezone.utc)
     if oldest_dt < END_DATE:
