@@ -108,17 +108,17 @@ def search_australia_cost_of_living(token, start_date=None, max_results=1000):
                             "id": uri.split("/")[-1],
                             "createdAt": created_at,
                             "content": content,
-                            "sensitive": False,
+                            "sensitive": None,  # not provided, using null
                             "favouritesCount": post.get("likeCount", 0),
                             "repliesCount": post.get("replyCount", 0),
-                            "tags": [],
+                            "tags": [term],  # Add the current search term as a tag
                             "url": f"https://bsky.app/profile/{post.get('author', {}).get('handle', '')}/post/{uri.split('/')[-1]}",
                             "account": {
                                 "id": post.get("author", {}).get("did", ""),
                                 "username": post.get("author", {}).get("handle", ""),
-                                "createdAt": "2022-10-30T00:00:00Z",
-                                "followersCount": 0,
-                                "followingCount": 0
+                                "createdAt": None,  # not provided, using null
+                                "followersCount": None,  # not provided, using null
+                                "followingCount": None  # not provided, using null
                             }
                         }
                     }
