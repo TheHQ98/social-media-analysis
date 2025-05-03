@@ -140,17 +140,71 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
         "data": data,
     }
 
+def convert_comment_to_target_format(comment, subreddit: str) -> dict:
+    fetched_at = datetime.now(timezone.utc).isoformat(timespec='seconds') + 'Z'
+    created_at = datetime.fromtimestamp(comment.created_utc, timezone.utc).isoformat(timespec='seconds') + 'Z'
+    post = comment.submission
+
+    # 作者信息
+    if comment.author:
+        try:
+            author_created = datetime.fromtimestamp(comment.author.created_utc, timezone.utc).isoformat(timespec="seconds") + "Z"
+            link_karma = comment.author.link_karma
+            comment_karma = comment.author.comment_karma
+        except Exception:
+            author_created = link_karma = comment_karma = None
+        account_data = {
+            "id": comment.author.id,
+            "username": comment.author.name,
+            "createdAt": author_created,
+            "followersCount/linkKarma": link_karma,
+            "followingCount/commentKarma": comment_karma,
+        }
+    else:
+        account_data = {
+            "id": None,
+            "username": "[Deleted]",
+            "createdAt": None,
+            "followersCount/linkKarma": None,
+            "followingCount/commentKarma": None,
+        }
+
+    tags = ["comment", subreddit]
+    if post.link_flair_text:
+        tags.append(post.link_flair_text)
+
+    data = {
+        "id": comment.id,
+        "post_id": post.id,
+        "createdAt": created_at,
+        "content": comment.body,
+        "sensitive": post.over_18,
+        "favouritesCount": comment.score,
+        "repliesCount": len(comment.replies),
+        "tags": tags,
+        "url": f"https://www.reddit.com{post.permalink}",
+        "account": account_data
+    }
+
+    return {
+        "platform": "Reddit",
+        "version": 2.1,
+        "fetchedAt": fetched_at,
+        "sentiment": None,
+        "sentimentLabel": None,
+        "keywords": [],
+        "data": data
+    }
+
 
 def fetch_reddit_posts(reddit):
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
-    # get the tag from redis list, if no more tag in list, then top
     subreddit = r.lindex(REDIS_TAGS_LIST, 0)
     if not subreddit:
         current_app.logger.warning("No more tags in Redis list.")
         return
 
-    # get the last recorded max_id from redis list
     state_key = f"reddit:max_fullname:{subreddit}"
     last_fullname = r.get(state_key)
 
@@ -164,8 +218,20 @@ def fetch_reddit_posts(reddit):
         return
 
     for post in posts:
-        data = convert_reddit_post_to_target_format(post, subreddit)
-        requests.post(QUEUE_ENDPOINT, json=data, timeout=5)
+        # 上传帖子数据
+        post_data = convert_reddit_post_to_target_format(post, subreddit)
+        requests.post(QUEUE_ENDPOINT, json=post_data, timeout=5)
+
+        # 上传评论数据（保持格式和流程一致）
+        try:
+            post.comment_sort = 'best'
+            post.comments.replace_more(limit=0)
+            for comment in post.comments:
+                if isinstance(comment, praw.models.Comment) and comment.depth == 0:
+                    comment_data = convert_comment_to_target_format(comment, subreddit)
+                    requests.post(QUEUE_ENDPOINT, json=comment_data, timeout=5)
+        except Exception as e:
+            current_app.logger.warning(f"评论处理失败: {e}")
 
     oldest = min(posts, key=lambda p: p.created_utc)
     r.set(state_key, oldest.fullname)
@@ -175,6 +241,7 @@ def fetch_reddit_posts(reddit):
     if oldest_dt < END_DATE:
         r.lpop(REDIS_TAGS_LIST)
         current_app.logger.warning(f"Touched END_DATE, removed r/{subreddit}")
+
 
 
 def main():
