@@ -38,10 +38,11 @@ export REDDIT_USER_AGENT='你的用户代理'
 
 ## 用法
 
-你可以将 [`reddit_fetcher.py`](reddit_fetcher.py) 中的函数导入到你自己的 Python 脚本中。
+你可以将 [`reddit_fetcher.py`](playground/reddit_fetcher.py) 中的函数导入到你自己的 Python 脚本中。
 
 ```python
-import reddit_fetcher
+
+from playground import reddit_fetcher
 import os
 
 # 确保环境变量已设置
@@ -69,7 +70,7 @@ if reddit:
     if search_results:
         comments = reddit_fetcher.get_post_comments(search_results[0], limit=5, depth=1)
         for comment in comments:
-             if isinstance(comment, praw.models.Comment): # 确保是评论对象
+            if isinstance(comment, praw.models.Comment):  # 确保是评论对象
                 comment_data = reddit_fetcher.format_comment_data(comment)
                 print(f"  - Comment by {comment_data['author']}: {comment_data['body'][:50]}...")
 
@@ -85,10 +86,10 @@ python reddit_fetcher.py
 
 ## 主要函数
 
-*   [`initialize_reddit()`](reddit_fetcher.py): 初始化并返回 PRAW Reddit 实例。
-*   [`get_subreddit_posts()`](reddit_fetcher.py): 从 subreddit 获取帖子。
-*   [`search_posts()`](reddit_fetcher.py): 搜索帖子。
-*   [`get_random_post()`](reddit_fetcher.py): 获取随机帖子。
-*   [`get_post_comments()`](reddit_fetcher.py): 获取帖子的评论。
-*   [`format_post_data()`](reddit_fetcher.py): 将帖子对象格式化为字典。
-*   [`format_comment_data()`](reddit_fetcher.py): 将评论对象格式化为字典。
+*   [`initialize_reddit()`](playground/reddit_fetcher.py): 初始化并返回 PRAW Reddit 实例。
+*   [`get_subreddit_posts()`](playground/reddit_fetcher.py): 从 subreddit 获取帖子。
+*   [`search_posts()`](playground/reddit_fetcher.py): 搜索帖子。
+*   [`get_random_post()`](playground/reddit_fetcher.py): 获取随机帖子。
+*   [`get_post_comments()`](playground/reddit_fetcher.py): 获取帖子的评论。
+*   [`format_post_data()`](playground/reddit_fetcher.py): 将帖子对象格式化为字典。
+*   [`format_comment_data()`](playground/reddit_fetcher.py): 将评论对象格式化为字典。

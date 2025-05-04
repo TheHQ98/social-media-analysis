@@ -6,12 +6,12 @@ import requests
 
 import praw
 from praw.models import Submission
-from prawcore.exceptions import PrawcoreException
+from prawcore.exceptions import PrawcoreException, NotFound
 
 CONFIG_MAP = "reddit-config2"
 REDIS_TAGS_LIST = "reddit:tags"
 END_DATE = datetime(2023, 1, 1, tzinfo=timezone.utc)
-LIMIT = 40
+LIMIT = 10
 
 REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
@@ -25,8 +25,6 @@ def config(k: str) -> str:
     with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
         return f.read()
 
-
-# --- Reddit 初始化 ---
 
 def initialize_reddit():
     """
@@ -61,11 +59,10 @@ def initialize_reddit():
         print("PRAW initial success")
         return reddit
     except Exception as e:
-        print(f"PRAW 初始化失败: {e}", file=sys.stderr)
+        current_app.logger.warning(f"PRAW initial failed: {e}")
         sys.exit(1)
 
 
-# --- 新增：转换为目标 JSON 结构的函数 ---
 def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> dict:
     """
     将 PRAW Submission 对象转换为指定的目标 JSON 结构。
@@ -77,20 +74,37 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
         dict: 符合目标结构的字典。
     """
     fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds") + "Z"
-    created_at = datetime.fromtimestamp(post.created_utc, timezone.utc).isoformat(timespec="seconds") + "Z"
+    created_at = (
+        datetime.fromtimestamp(post.created_utc, timezone.utc).isoformat(timespec="seconds") + "Z"
+        if post.created_utc else None
+    )
 
-    if post.author:
-        author_id = getattr(post.author, "id", None)
-        author_username = getattr(post.author, "name", "[Unknown]")
+    author_obj = post.author
+    if author_obj is None:
+        account_data = {
+            "id": None,
+            "username": "[Deleted]",
+            "createdAt": None,
+            "followersCount/linkKarma": None,
+            "followingCount/commentKarma": None,
+        }
+    else:
         try:
+            author_id = author_obj.id
+            author_username = author_obj.name or "[Unknown]"
             author_created = datetime.fromtimestamp(
-                post.author.created_utc, timezone.utc
+                author_obj.created_utc, timezone.utc
             ).isoformat(timespec="seconds") + "Z"
-            link_karma = getattr(post.author, "link_karma", None)
-            comment_karma = getattr(post.author, "comment_karma", None)
-        except (AttributeError, PrawcoreException):
-            current_app.logger.info(f"[{post.id}] author info unavailable")
-            author_created = link_karma = comment_karma = None
+            link_karma = getattr(author_obj, "link_karma", None)
+            comment_karma = getattr(author_obj, "comment_karma", None)
+        except (NotFound, PrawcoreException) as e:
+            current_app.logger.error(
+                f"[{post.id}] author fetch failed: https://www.reddit.com{post.permalink}"
+            )
+            author_id = None
+            author_username = "[Unavailable]"
+            author_created = None
+            link_karma = comment_karma = None
 
         account_data = {
             "id": author_id,
@@ -99,21 +113,11 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
             "followersCount/linkKarma": link_karma,
             "followingCount/commentKarma": comment_karma,
         }
-    else:  # Author deleted
-        account_data = {
-            "id": None,
-            "username": "[Deleted]",
-            "createdAt": None,
-            "followersCount/linkKarma": None,
-            "followingCount/commentKarma": None,
-        }
 
-    # 确定 content 字段内容
     content = post.title
     if post.is_self and post.selftext:
         content += f"\n\n{post.selftext}"
 
-    # 处理 tags
     tags = [post.link_flair_text] if post.link_flair_text else []
     if tags:
         tags.append(subreddit.lower())
@@ -140,27 +144,14 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
         "data": data,
     }
 
+
 def convert_comment_to_target_format(comment, subreddit: str) -> dict:
     fetched_at = datetime.now(timezone.utc).isoformat(timespec='seconds') + 'Z'
     created_at = datetime.fromtimestamp(comment.created_utc, timezone.utc).isoformat(timespec='seconds') + 'Z'
     post = comment.submission
 
-    # 作者信息
-    if comment.author:
-        try:
-            author_created = datetime.fromtimestamp(comment.author.created_utc, timezone.utc).isoformat(timespec="seconds") + "Z"
-            link_karma = comment.author.link_karma
-            comment_karma = comment.author.comment_karma
-        except Exception:
-            author_created = link_karma = comment_karma = None
-        account_data = {
-            "id": comment.author.id,
-            "username": comment.author.name,
-            "createdAt": author_created,
-            "followersCount/linkKarma": link_karma,
-            "followingCount/commentKarma": comment_karma,
-        }
-    else:
+    author_obj = comment.author
+    if author_obj is None:
         account_data = {
             "id": None,
             "username": "[Deleted]",
@@ -168,13 +159,34 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
             "followersCount/linkKarma": None,
             "followingCount/commentKarma": None,
         }
+    else:
+        try:
+            author_id = author_obj.id
+            author_username = author_obj.name or "[Unknown]"
+            author_created = datetime.fromtimestamp(author_obj.created_utc, timezone.utc).isoformat(
+                timespec="seconds") + "Z"
+            link_karma = getattr(author_obj, "link_karma", None)
+            comment_karma = getattr(author_obj, "comment_karma", None)
+        except (NotFound, PrawcoreException):
+            author_id = None
+            author_username = "[Unavailable]"
+            author_created = None
+            link_karma = comment_karma = None
+
+        account_data = {
+            "id": author_id,
+            "username": author_username,
+            "createdAt": author_created,
+            "followersCount/linkKarma": link_karma,
+            "followingCount/commentKarma": comment_karma,
+        }
 
     tags = [f"comment: {post.id}", subreddit]
     if post.link_flair_text:
         tags.append(post.link_flair_text)
 
     data = {
-        "id": comment.id,
+        "id": f"comment_{comment.id}",
         "createdAt": created_at,
         "content": comment.body,
         "sensitive": post.over_18,
@@ -187,7 +199,7 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
 
     return {
         "platform": "Reddit",
-        "version": 2.1,
+        "version": 1.1,
         "fetchedAt": fetched_at,
         "sentiment": None,
         "sentimentLabel": None,
@@ -230,17 +242,15 @@ def fetch_reddit_posts(reddit):
                     comment_data = convert_comment_to_target_format(comment, subreddit)
                     requests.post(QUEUE_ENDPOINT, json=comment_data, timeout=5)
         except Exception as e:
-            current_app.logger.warning(f"评论处理失败: {e}")
+            current_app.logger.warning(f"Process comment error: {e}")
 
     oldest = min(posts, key=lambda p: p.created_utc)
     r.set(state_key, oldest.fullname)
-    current_app.logger.info(f"Update last_fullname")
 
     oldest_dt = datetime.fromtimestamp(oldest.created_utc, timezone.utc)
     if oldest_dt < END_DATE:
         r.lpop(REDIS_TAGS_LIST)
         current_app.logger.warning(f"Touched END_DATE, removed r/{subreddit}")
-
 
 
 def main():
