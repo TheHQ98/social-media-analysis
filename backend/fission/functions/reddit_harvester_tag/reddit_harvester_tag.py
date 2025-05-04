@@ -169,13 +169,12 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
             "followingCount/commentKarma": None,
         }
 
-    tags = ["comment", subreddit]
+    tags = [f"comment: {post.id}", subreddit]
     if post.link_flair_text:
         tags.append(post.link_flair_text)
 
     data = {
         "id": comment.id,
-        "post_id": post.id,
         "createdAt": created_at,
         "content": comment.body,
         "sensitive": post.over_18,
