@@ -100,8 +100,6 @@ class LiveMutationTest(unittest.TestCase):
     def setUpClass(cls):
         print("Fetching live post from Mastodon...")
         cls.base_post = get_live_post()
-        with open("base_post.json", "w", encoding="utf-8") as f:
-            json.dump(cls.base_post, f, indent=2, default=str)
 
     def try_mutation(self, mutated, description):
         with self.subTest(desc=description):
