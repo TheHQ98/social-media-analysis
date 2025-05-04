@@ -3,6 +3,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from mastodon import Mastodon
 import requests
+import argparse
 
 LIMIT = 40
 YEARS = 3
@@ -89,7 +90,7 @@ def fetch_tags_and_send_posts():
     while True:
         posts = mastodon.timeline_hashtag(
             TAG,
-            limit=40,
+            limit=10,
             max_id=max_id
         )
 
@@ -117,22 +118,54 @@ def fetch_tags_and_send_posts():
         max_id = int(posts[-1]["id"]) - 1
         time.sleep(0.5)
 
+def run_test_mode(testfile=None):
+    if testfile:
+        print(f"Loading test cases from file: {testfile}")
+        with open(testfile, "r", encoding="utf-8") as f:
+            test_cases = json.load(f)
+    else:
+        print("Entering manual test mode. Paste JSON input (empty line to finish):")
+        lines = []
+        while True:
+            line = input()
+            if line.strip() == "":
+                break
+            lines.append(line)
+        try:
+            test_cases = [json.loads("\n".join(lines))]
+        except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}")
+            return
+
+    for idx, test_post in enumerate(test_cases):
+        try:
+            print(f"\n--- Test Case {idx + 1} ---")
+            processed = fetch_post_data(test_post)
+            print(json.dumps(processed, indent=2))
+        except Exception as e:
+            print(f"Error in processing: {e}")
 
 def main():
-    posts = fetch_posts(limit=LIMIT)
-    # fetch_tags_and_send_posts()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--test', action='store_true', help='Enable test mode with manual input')
+    parser.add_argument('--testfile', type=str, help='Provide JSON file for test input')
+    args = parser.parse_args()
 
-    for post in posts:
-        try:
-            res = requests.post(
-                url="http://router.fission.svc.cluster.local/enqueue/mastodon",
-                json=post,
-                timeout=5
-            )
-        except Exception as e:
-            print(f"Error pushing to queue: {e}")
-
-    return "OK: fetched mastodon posts"
+    if args.test:
+        run_test_mode(args.testfile)
+    else:
+        posts = fetch_posts(limit=LIMIT)
+        for post in posts:
+            print(post)
+            try:
+                res = requests.post(
+                    url="http://router.fission.svc.cluster.local/enqueue/mastodon",
+                    json=post,
+                    timeout=5
+                )
+            except Exception as e:
+                print(f"Error pushing to queue: {e}")
+        return "OK: fetched mastodon posts"
 
 
 if __name__ == "__main__":
