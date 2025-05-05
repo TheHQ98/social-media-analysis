@@ -11,7 +11,7 @@ from prawcore.exceptions import PrawcoreException, NotFound
 CONFIG_MAP = "reddit-config2"
 REDIS_TAGS_LIST = "reddit:tags"
 END_DATE = datetime(2023, 1, 1, tzinfo=timezone.utc)
-LIMIT = 10
+LIMIT = 5
 
 REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
@@ -95,8 +95,7 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
             author_created = datetime.fromtimestamp(
                 author_obj.created_utc, timezone.utc
             ).isoformat(timespec="seconds") + "Z"
-            link_karma = getattr(author_obj, "link_karma", None)
-            comment_karma = getattr(author_obj, "comment_karma", None)
+            link_karma = comment_karma = 0
         except (NotFound, PrawcoreException) as e:
             current_app.logger.error(
                 f"[{post.id}] author fetch failed: https://www.reddit.com{post.permalink}"
@@ -104,7 +103,7 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
             author_id = None
             author_username = "[Unavailable]"
             author_created = None
-            link_karma = comment_karma = None
+            link_karma = comment_karma = 0
 
         account_data = {
             "id": author_id,
@@ -165,13 +164,12 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
             author_username = author_obj.name or "[Unknown]"
             author_created = datetime.fromtimestamp(author_obj.created_utc, timezone.utc).isoformat(
                 timespec="seconds") + "Z"
-            link_karma = getattr(author_obj, "link_karma", None)
-            comment_karma = getattr(author_obj, "comment_karma", None)
+            link_karma = comment_karma = 0
         except (NotFound, PrawcoreException):
             author_id = None
             author_username = "[Unavailable]"
             author_created = None
-            link_karma = comment_karma = None
+            link_karma = comment_karma = 0
 
         account_data = {
             "id": author_id,
@@ -220,11 +218,11 @@ def fetch_reddit_posts(reddit):
     last_fullname = r.get(state_key)
 
     sub = reddit.subreddit(subreddit)
-    params = {"after": last_fullname} if last_fullname else None
+    params = {"before": last_fullname} if last_fullname else None
     posts = list(sub.new(limit=LIMIT, params=params))
 
     if not posts:
-        current_app.logger.warning(f"Didn't get any posts from r/{subreddit}")
+        current_app.logger.warning(f"No posts found for r/{subreddit} before {last_fullname}")
         r.lpop(REDIS_TAGS_LIST)
         return
 
@@ -237,18 +235,24 @@ def fetch_reddit_posts(reddit):
         try:
             post.comment_sort = 'best'
             post.comments.replace_more(limit=0)
+
+            count = 0
             for comment in post.comments:
                 if isinstance(comment, praw.models.Comment) and comment.depth == 0:
                     comment_data = convert_comment_to_target_format(comment, subreddit)
                     requests.post(QUEUE_ENDPOINT, json=comment_data, timeout=5)
+                    count += 1
+                    if count >= 5:
+                        break
         except Exception as e:
             current_app.logger.warning(f"Process comment error: {e}")
 
     oldest = min(posts, key=lambda p: p.created_utc)
     r.set(state_key, oldest.fullname)
+    current_app.logger.info(f"Updated {state_key} to {oldest.fullname}")
 
-    oldest_dt = datetime.fromtimestamp(oldest.created_utc, timezone.utc)
-    if oldest_dt < END_DATE:
+    latest_dt = datetime.fromtimestamp(oldest.created_utc, timezone.utc)
+    if latest_dt < END_DATE:
         r.lpop(REDIS_TAGS_LIST)
         current_app.logger.warning(f"Touched END_DATE, removed r/{subreddit}")
 
