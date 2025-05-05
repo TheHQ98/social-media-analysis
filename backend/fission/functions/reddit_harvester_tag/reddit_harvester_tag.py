@@ -90,15 +90,15 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
         }
     else:
         try:
-            author_id = author_obj.id
             author_username = author_obj.name or "[Unknown]"
+            author_id = f"t2_{author_username}"
             author_created = datetime.fromtimestamp(
                 author_obj.created_utc, timezone.utc
             ).isoformat(timespec="seconds") + "Z"
             link_karma = comment_karma = 0
-        except (NotFound, PrawcoreException) as e:
-            current_app.logger.error(
-                f"[{post.id}] author fetch failed: https://www.reddit.com{post.permalink}"
+        except Exception as e:
+            current_app.logger.warning(
+                f"[{post.id}] failed to fetch author info: {e}"
             )
             author_id = None
             author_username = "[Unavailable]"
@@ -160,8 +160,8 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
         }
     else:
         try:
-            author_id = author_obj.id
             author_username = author_obj.name or "[Unknown]"
+            author_id = f"t2_{author_username}"
             author_created = datetime.fromtimestamp(author_obj.created_utc, timezone.utc).isoformat(
                 timespec="seconds") + "Z"
             link_karma = comment_karma = 0
