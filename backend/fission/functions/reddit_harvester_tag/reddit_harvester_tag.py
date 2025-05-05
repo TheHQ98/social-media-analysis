@@ -11,7 +11,7 @@ from prawcore.exceptions import PrawcoreException, NotFound
 CONFIG_MAP = "reddit-config2"
 REDIS_TAGS_LIST = "reddit:tags"
 END_DATE = datetime(2023, 1, 1, tzinfo=timezone.utc)
-LIMIT = 5
+LIMIT = 8
 
 REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
