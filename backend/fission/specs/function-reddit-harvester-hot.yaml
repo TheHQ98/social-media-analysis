@@ -2,7 +2,7 @@ apiVersion: fission.io/v1
 kind: Function
 metadata:
   creationTimestamp: null
-  name: reddit-harvester-tag
+  name: reddit-harvester-hot
 spec:
   InvokeStrategy:
     ExecutionStrategy:
@@ -22,9 +22,9 @@ spec:
   functionTimeout: 60
   idletimeout: 120
   package:
-    functionName: reddit_harvester_tag.main
+    functionName: reddit_harvester_hot.main
     packageref:
-      name: reddit-harvester-tag
+      name: reddit-harvester-hot
       namespace: ""
   requestsPerPod: 1
   resources: {}
