@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 import os
 
+
 def load_session():
     load_dotenv("bluesky.env")
     username = os.getenv("BSKY_USERNAME")
@@ -29,6 +30,7 @@ def load_session():
         print(f"Error during login: {e}")
         print("Please ensure you are using the correct username/email and app password.")
         exit(1)
+
 
 def search_australia_cost_of_living(token, start_date=None, max_results=1000):
     url = "https://bsky.social/xrpc/app.bsky.feed.searchPosts"
@@ -501,12 +503,14 @@ def search_australia_cost_of_living(token, start_date=None, max_results=1000):
 
     print(f"\n Total posts fetched across all terms: {total_fetched_posts}")
 
+
 def main():
-    three_years_ago = datetime.now(timezone.utc) - timedelta(days=3*365)
+    three_years_ago = datetime.now(timezone.utc) - timedelta(days=3 * 365)
 
     token = load_session()
 
     search_australia_cost_of_living(token, start_date=three_years_ago)
+
 
 if __name__ == "__main__":
     main()

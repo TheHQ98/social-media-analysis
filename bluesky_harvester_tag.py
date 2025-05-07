@@ -16,9 +16,11 @@ REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
 QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/bluesky"
 
+
 def config(k: str) -> str:
     with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
         return f.read()
+
 
 def load_session():
     username = config('BSKY_USERNAME')
@@ -41,6 +43,7 @@ def load_session():
     except Exception as e:
         current_app.logger.error(f"Error during login: {e}")
         return None
+
 
 def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
     record = post.get("record", {})
@@ -76,6 +79,7 @@ def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
         }
     }
     return doc
+
 
 def fetch_bluesky_posts(token):
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
@@ -124,13 +128,15 @@ def fetch_bluesky_posts(token):
 
         if posts:
             oldest_post = min(posts, key=lambda p: p.get("record", {}).get("createdAt", ""))
-            created_at = datetime.fromisoformat(oldest_post.get("record", {}).get("createdAt", "").replace("Z", "+00:00"))
+            created_at = datetime.fromisoformat(
+                oldest_post.get("record", {}).get("createdAt", "").replace("Z", "+00:00"))
             if created_at < END_DATE:
                 r.lpop(REDIS_TAGS_LIST)
                 current_app.logger.warning(f"Touched END_DATE, removed term '{search_term}'")
 
     except Exception as e:
         current_app.logger.error(f"Error during fetch: {e}")
+
 
 def main():
     token = load_session()
@@ -140,5 +146,6 @@ def main():
     fetch_bluesky_posts(token)
     return "OK"
 
+
 if __name__ == "__main__":
-    main() 
+    main()
