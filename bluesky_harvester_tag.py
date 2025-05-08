@@ -16,20 +16,17 @@ REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
 QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/bluesky"
 
-def config(k: str) -> str:
-    with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
-        return f.read()
+# Bluesky 账号配置
+BSKY_USERNAME = "upskysun.bsky.social"
+BSKY_APP_PASSWORD = "wxlj-hvpk-z67p-3chj"
 
 def load_session():
-    username = config('BSKY_USERNAME')
-    password = config('BSKY_APP_PASSWORD')
-
-    if not username or not password:
+    if not BSKY_USERNAME or not BSKY_APP_PASSWORD:
         current_app.logger.error("Error: Missing configuration BSKY_USERNAME or BSKY_APP_PASSWORD.")
         return None
 
     url = "https://bsky.social/xrpc/com.atproto.server.createSession"
-    payload = {"identifier": username, "password": password}
+    payload = {"identifier": BSKY_USERNAME, "password": BSKY_APP_PASSWORD}
 
     try:
         res = requests.post(url, json=payload)
@@ -43,6 +40,9 @@ def load_session():
         return None
 
 def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
+    """
+    将 Bluesky 帖子转换为目标 JSON 结构
+    """
     record = post.get("record", {})
     created_at = record.get("createdAt", "")
     content = record.get("text", "")
@@ -78,6 +78,9 @@ def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
     return doc
 
 def fetch_bluesky_posts(token):
+    """
+    从 Bluesky 获取帖子
+    """
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
     # 从 Redis 获取当前搜索词
@@ -118,10 +121,12 @@ def fetch_bluesky_posts(token):
             post_data = convert_bluesky_post_to_target_format(post, search_term)
             requests.post(QUEUE_ENDPOINT, json=post_data, timeout=5)
 
+        # 更新游标
         if data.get("cursor"):
             r.set(state_key, data["cursor"])
             current_app.logger.info(f"Updated {state_key} to {data['cursor']}")
 
+        # 检查是否达到结束日期
         if posts:
             oldest_post = min(posts, key=lambda p: p.get("record", {}).get("createdAt", ""))
             created_at = datetime.fromisoformat(oldest_post.get("record", {}).get("createdAt", "").replace("Z", "+00:00"))
