@@ -7,20 +7,26 @@ from flask import current_app
 import os
 from dotenv import load_dotenv
 
+# Configuration constants
 CONFIG_MAP = "bluesky-config"
 REDIS_TAGS_LIST = "bluesky:tags"
 END_DATE = datetime(2023, 1, 1, tzinfo=timezone.utc)
-LIMIT = 8  # 每次抓取的帖子数量
+LIMIT = 8  # Number of posts to fetch per request
 
+# Redis and Queue configuration
 REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
 QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/bluesky"
 
-# Bluesky 账号配置
+# Bluesky account credentials
 BSKY_USERNAME = "upskysun.bsky.social"
 BSKY_APP_PASSWORD = "wxlj-hvpk-z67p-3chj"
 
 def load_session():
+    """
+    Initialize a Bluesky session by authenticating with the provided credentials.
+    Returns the access JWT token if successful, None otherwise.
+    """
     if not BSKY_USERNAME or not BSKY_APP_PASSWORD:
         current_app.logger.error("Error: Missing configuration BSKY_USERNAME or BSKY_APP_PASSWORD.")
         return None
@@ -41,7 +47,14 @@ def load_session():
 
 def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
     """
-    将 Bluesky 帖子转换为目标 JSON 结构
+    Convert a Bluesky post to the standardized target format.
+    
+    Args:
+        post (dict): The original Bluesky post data
+        search_term (str): The search term used to find this post
+        
+    Returns:
+        dict: Post data in the standardized format
     """
     record = post.get("record", {})
     created_at = record.get("createdAt", "")
@@ -79,17 +92,28 @@ def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
 
 def fetch_bluesky_posts(token):
     """
-    从 Bluesky 获取帖子
+    Fetch posts from Bluesky based on search terms stored in Redis.
+    
+    Args:
+        token (str): The authentication token for Bluesky API
+        
+    The function:
+    1. Gets the next search term from Redis
+    2. Fetches posts matching the search term
+    3. Converts posts to target format
+    4. Sends posts to the queue endpoint
+    5. Updates the cursor for pagination
+    6. Removes search term if end date is reached
     """
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
-    # 从 Redis 获取当前搜索词
+    # Get the current search term from Redis
     search_term = r.lindex(REDIS_TAGS_LIST, 0)
     if not search_term:
         current_app.logger.warning("No more search terms in Redis list.")
         return
 
-    # 获取上次抓取的位置
+    # Get the last cursor position for pagination
     state_key = f"bluesky:last_cursor:{search_term}"
     last_cursor = r.get(state_key)
 
@@ -117,16 +141,17 @@ def fetch_bluesky_posts(token):
             r.lpop(REDIS_TAGS_LIST)
             return
 
+        # Process each post and send to queue
         for post in posts:
             post_data = convert_bluesky_post_to_target_format(post, search_term)
             requests.post(QUEUE_ENDPOINT, json=post_data, timeout=5)
 
-        # 更新游标
+        # Update cursor for pagination
         if data.get("cursor"):
             r.set(state_key, data["cursor"])
             current_app.logger.info(f"Updated {state_key} to {data['cursor']}")
 
-        # 检查是否达到结束日期
+        # Check if we've reached the end date
         if posts:
             oldest_post = min(posts, key=lambda p: p.get("record", {}).get("createdAt", ""))
             created_at = datetime.fromisoformat(oldest_post.get("record", {}).get("createdAt", "").replace("Z", "+00:00"))
@@ -138,6 +163,10 @@ def fetch_bluesky_posts(token):
         current_app.logger.error(f"Error during fetch: {e}")
 
 def main():
+    """
+    Main entry point of the script.
+    Initializes a Bluesky session and starts fetching posts.
+    """
     token = load_session()
     if not token:
         return "Error: Failed to initialize Bluesky session"
