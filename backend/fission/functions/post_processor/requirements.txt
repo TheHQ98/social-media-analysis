@@ -1,0 +1,4 @@
+beautifulsoup4==4.13.3
+vaderSentiment==3.3.2
+yake==0.4.8
+langdetect==1.0.9

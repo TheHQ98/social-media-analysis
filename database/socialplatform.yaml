@@ -1,0 +1,49 @@
+settings:
+  index:
+    number_of_shards: 3
+    number_of_replicas: 1
+
+mappings:
+  properties:
+    platform:
+      type: keyword
+    version:
+      type: float
+    fetchedAt:
+      type: date
+    sentiment:
+      type: float
+    sentimentLabel:
+      type: keyword
+    keywords:
+      type: keyword
+    data:
+      properties:
+        id:
+          type: keyword
+        createdAt:
+          type: date
+        content:
+          type: text
+        sensitive:
+          type: boolean
+        favouritesCount:
+          type: integer
+        repliesCount:
+          type: integer
+        tags:
+          type: keyword
+        url:
+          type: keyword
+        account:
+          properties:
+            id:
+              type: keyword
+            username:
+              type: keyword
+            createdAt:
+              type: date
+            followersCount/linkKarma:
+              type: integer
+            followingCount/commentKarma:
+              type: integer
