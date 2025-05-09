@@ -78,7 +78,7 @@ def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
             "id": uri.split("/")[-1],
             "createdAt": created_at,
             "content": content,
-            "sensitive": "false",
+            "sensitive": False,
             "favouritesCount": post.get("likeCount", 0),
             "repliesCount": post.get("replyCount", 0),
             "tags": [search_term],
@@ -87,8 +87,8 @@ def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
                 "id": post.get("author", {}).get("did", ""),
                 "username": post.get("author", {}).get("handle", ""),
                 "createdAt": "1970-01-01T00:00:00Z",
-                "followersCount": 0,
-                "followingCount": 0
+                "followersCount/linkKarma": 0,
+                "followingCount/commentKarma": 0
             }
         }
     }
