@@ -3,20 +3,20 @@ from datetime import datetime, timezone
 import redis
 from flask import current_app
 import requests
-
 import praw
 from praw.models import Submission
 from prawcore.exceptions import PrawcoreException, NotFound
 
+# Search range settings
 CONFIG_MAP = "reddit-config2"
 REDIS_TAGS_LIST = "reddit:tags"
 END_DATE = datetime(2023, 1, 1, tzinfo=timezone.utc)
 LIMIT = 8
 
+# Connect to the server
 REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
 QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/reddit"
-
 
 def config(k: str) -> str:
     """
@@ -25,20 +25,17 @@ def config(k: str) -> str:
     with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
         return f.read()
 
-
 def initialize_reddit():
     """
-    使用环境变量中的凭据初始化并返回一个 PRAW Reddit 实例。
+    Initializes and returns a PRAW Reddit instance using credentials from config files
 
-    环境变量需要设置:
-    - REDDIT_CLIENT_ID: 你的 Reddit 应用 Client ID
-    - REDDIT_CLIENT_SECRET: 你的 Reddit 应用 Client Secret
-    - REDDIT_USER_AGENT: 一个描述性的 User Agent 字符串 (例如 'MyRedditBot/1.0 by u/YourUsername')
-
-    如果凭据未设置或无效，将打印错误信息并退出程序。
+    Required config keys:
+    - REDDIT_CLIENT_ID: Reddit application Client ID
+    - REDDIT_CLIENT_SECRET: Reddit application Client Secret
+    - REDDIT_USER_AGENT: Descriptive user agent string (e.g., 'MyBot/1.0 by u/username')
 
     Returns:
-        praw.Reddit: 配置好的 PRAW Reddit 实例。
+        praw.Reddit: Configured Reddit client
     """
 
     client_id = config('REDDIT_CLIENT_ID')
@@ -46,7 +43,7 @@ def initialize_reddit():
     user_agent = config('REDDIT_USER_AGENT')
 
     if not all([client_id, client_secret, user_agent]):
-        print("错误：请设置环境变量 REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, 和 REDDIT_USER_AGENT。", file=sys.stderr)
+        print("Error：Please set up REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, and REDDIT_USER_AGENT", file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -62,16 +59,16 @@ def initialize_reddit():
         current_app.logger.warning(f"PRAW initial failed: {e}")
         sys.exit(1)
 
-
 def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> dict:
     """
-    将 PRAW Submission 对象转换为指定的目标 JSON 结构。
+    Converts a PRAW Submission object into the target JSON structure
 
     Args:
-        post (praw.models.Submission): Reddit 帖子对象。
-        subreddit: current subreddit topic
+        post (praw.models.Submission): Reddit post object
+        subreddit (str): Name of the current subreddit
+
     Returns:
-        dict: 符合目标结构的字典。
+        dict: Formatted dictionary matching the target schema
     """
     fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds") + "Z"
     created_at = (
@@ -143,7 +140,6 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
         "data": data,
     }
 
-
 def convert_comment_to_target_format(comment, subreddit: str) -> dict:
     fetched_at = datetime.now(timezone.utc).isoformat(timespec='seconds') + 'Z'
     created_at = datetime.fromtimestamp(comment.created_utc, timezone.utc).isoformat(timespec='seconds') + 'Z'
@@ -205,8 +201,17 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
         "data": data
     }
 
-
 def fetch_reddit_posts(reddit):
+    '''
+    Fetches recent posts from the current subreddit tag in Redis, converts them to the target format,
+    and uploads them to the queue endpoint
+
+    Args:
+        reddit (praw.Reddit): An initialized Reddit API client
+
+    Returns:
+        None
+    '''
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
     subreddit = r.lindex(REDIS_TAGS_LIST, 0)
@@ -227,11 +232,11 @@ def fetch_reddit_posts(reddit):
         return
 
     for post in posts:
-        # 上传帖子数据
+        # upload post information
         post_data = convert_reddit_post_to_target_format(post, subreddit)
         requests.post(QUEUE_ENDPOINT, json=post_data, timeout=5)
 
-        # 上传评论数据（保持格式和流程一致）
+        # upload comment information (same format)
         try:
             post.comment_sort = 'best'
             post.comments.replace_more(limit=0)
@@ -256,14 +261,11 @@ def fetch_reddit_posts(reddit):
         r.lpop(REDIS_TAGS_LIST)
         current_app.logger.warning(f"Touched END_DATE, removed r/{subreddit}")
 
-
 def main():
+    # Initialize a Reddit API client
     reddit = initialize_reddit()
-
     fetch_reddit_posts(reddit)
-
     return "OK"
-
 
 if __name__ == "__main__":
     main()
