@@ -459,8 +459,8 @@ def search_australia_cost_of_living(token, start_date=None, max_results=1000):
                         "platform": "Bluesky",
                         "version": 1.1,
                         "fetchedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                        "sentiment": None,
-                        "sentimentLabel": None,
+                        "sentiment": None,    # not provided, using null
+                        "sentimentLabel": None,  # not provided, using null
                         "keywords": [],
                         "data": {
                             "id": uri.split("/")[-1],
