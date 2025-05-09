@@ -1,38 +1,41 @@
-import json
 import requests
-import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import redis
 from flask import current_app
-import os
-from dotenv import load_dotenv
 
 # Configuration constants
 CONFIG_MAP = "bluesky-config"
 REDIS_TAGS_LIST = "bluesky:tags"
-END_DATE = datetime(2023, 1, 1, tzinfo=timezone.utc)
-LIMIT = 8  # Number of posts to fetch per request
+LIMIT = 40  # Number of posts to fetch per request
 
 # Redis and Queue configuration
 REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
 QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/bluesky"
 
-# Bluesky account credentials
-BSKY_USERNAME = "upskysun.bsky.social"
-BSKY_APP_PASSWORD = "wxlj-hvpk-z67p-3chj"
+
+def config(k: str) -> str:
+    """
+    Reads configuration from config map file
+    """
+    with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
+        return f.read()
+
 
 def load_session():
     """
     Initialize a Bluesky session by authenticating with the provided credentials.
     Returns the access JWT token if successful, None otherwise.
     """
-    if not BSKY_USERNAME or not BSKY_APP_PASSWORD:
+    username = config('BSKY_USERNAME')
+    password = config('BSKY_APP_PASSWORD')
+
+    if not username or not password:
         current_app.logger.error("Error: Missing configuration BSKY_USERNAME or BSKY_APP_PASSWORD.")
         return None
 
     url = "https://bsky.social/xrpc/com.atproto.server.createSession"
-    payload = {"identifier": BSKY_USERNAME, "password": BSKY_APP_PASSWORD}
+    payload = {"identifier": username, "password": password}
 
     try:
         res = requests.post(url, json=payload)
@@ -44,6 +47,7 @@ def load_session():
     except Exception as e:
         current_app.logger.error(f"Error during login: {e}")
         return None
+
 
 def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
     """
@@ -74,7 +78,7 @@ def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
             "id": uri.split("/")[-1],
             "createdAt": created_at,
             "content": content,
-            "sensitive": None,
+            "sensitive": "false",
             "favouritesCount": post.get("likeCount", 0),
             "repliesCount": post.get("replyCount", 0),
             "tags": [search_term],
@@ -82,13 +86,14 @@ def convert_bluesky_post_to_target_format(post, search_term: str) -> dict:
             "account": {
                 "id": post.get("author", {}).get("did", ""),
                 "username": post.get("author", {}).get("handle", ""),
-                "createdAt": None,
-                "followersCount": None,
-                "followingCount": None
+                "createdAt": "1970-01-01T00:00:00Z",
+                "followersCount": 0,
+                "followingCount": 0
             }
         }
     }
     return doc
+
 
 def fetch_bluesky_posts(token):
     """
@@ -102,20 +107,14 @@ def fetch_bluesky_posts(token):
     2. Fetches posts matching the search term
     3. Converts posts to target format
     4. Sends posts to the queue endpoint
-    5. Updates the cursor for pagination
-    6. Removes search term if end date is reached
     """
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
     # Get the current search term from Redis
-    search_term = r.lindex(REDIS_TAGS_LIST, 0)
+    search_term = r.lpop(REDIS_TAGS_LIST)
     if not search_term:
         current_app.logger.warning("No more search terms in Redis list.")
         return
-
-    # Get the last cursor position for pagination
-    state_key = f"bluesky:last_cursor:{search_term}"
-    last_cursor = r.get(state_key)
 
     url = "https://bsky.social/xrpc/app.bsky.feed.searchPosts"
     headers = {
@@ -125,10 +124,9 @@ def fetch_bluesky_posts(token):
 
     params = {
         "q": search_term,
+        "sort": "latest",
         "limit": LIMIT
     }
-    if last_cursor:
-        params["cursor"] = last_cursor
 
     try:
         res = requests.get(url, headers=headers, params=params)
@@ -138,7 +136,6 @@ def fetch_bluesky_posts(token):
         posts = data.get("posts", [])
         if not posts:
             current_app.logger.warning(f"No posts found for term '{search_term}'")
-            r.lpop(REDIS_TAGS_LIST)
             return
 
         # Process each post and send to queue
@@ -146,21 +143,12 @@ def fetch_bluesky_posts(token):
             post_data = convert_bluesky_post_to_target_format(post, search_term)
             requests.post(QUEUE_ENDPOINT, json=post_data, timeout=5)
 
-        # Update cursor for pagination
-        if data.get("cursor"):
-            r.set(state_key, data["cursor"])
-            current_app.logger.info(f"Updated {state_key} to {data['cursor']}")
-
-        # Check if we've reached the end date
-        if posts:
-            oldest_post = min(posts, key=lambda p: p.get("record", {}).get("createdAt", ""))
-            created_at = datetime.fromisoformat(oldest_post.get("record", {}).get("createdAt", "").replace("Z", "+00:00"))
-            if created_at < END_DATE:
-                r.lpop(REDIS_TAGS_LIST)
-                current_app.logger.warning(f"Touched END_DATE, removed term '{search_term}'")
-
     except Exception as e:
         current_app.logger.error(f"Error during fetch: {e}")
+
+    finally:
+        r.rpush(REDIS_TAGS_LIST, search_term)
+
 
 def main():
     """
@@ -174,5 +162,6 @@ def main():
     fetch_bluesky_posts(token)
     return "OK"
 
+
 if __name__ == "__main__":
-    main() 
+    main()
