@@ -1,3 +1,7 @@
+"""
+
+"""
+
 import sys
 from datetime import datetime, timezone
 import redis
@@ -18,12 +22,14 @@ REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
 QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/reddit"
 
+
 def config(k: str) -> str:
     """
     Reads configuration from config map file
     """
     with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
         return f.read()
+
 
 def initialize_reddit():
     """
@@ -59,6 +65,7 @@ def initialize_reddit():
     except Exception as e:
         current_app.logger.warning(f"PRAW initial failed: {e}")
         sys.exit(1)
+
 
 def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> dict:
     """
@@ -141,6 +148,7 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
         "data": data,
     }
 
+
 def convert_comment_to_target_format(comment, subreddit: str) -> dict:
     """
     Converts a PRAW Comment object into the target JSON structure
@@ -185,7 +193,7 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
             "followersCount/linkKarma": link_karma,
             "followingCount/commentKarma": comment_karma,
         }
-    # Add a "comment" tag to seperate from other posts, and also mark the id of its parent post
+    # Add a "comment" tag to separate from other posts, and also mark the id of its parent post
     tags = [f"comment: {post.id}", subreddit]
     if post.link_flair_text:
         tags.append(post.link_flair_text)
@@ -211,6 +219,7 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
         "keywords": [],
         "data": data
     }
+
 
 def fetch_reddit_posts(reddit):
     """
@@ -273,6 +282,7 @@ def fetch_reddit_posts(reddit):
         r.lpop(REDIS_TAGS_LIST)
         current_app.logger.warning(f"Touched END_DATE, removed r/{subreddit}")
 
+
 def main():
     """
     Main entry point. Initializes Reddit client and starts post fetching process
@@ -281,6 +291,7 @@ def main():
     reddit = initialize_reddit()
     fetch_reddit_posts(reddit)
     return "OK"
+
 
 if __name__ == "__main__":
     main()

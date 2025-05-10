@@ -1,3 +1,7 @@
+"""
+
+"""
+
 import sys
 from datetime import datetime, timezone
 import redis
@@ -5,7 +9,6 @@ from flask import current_app
 import requests
 import praw
 from praw.models import Submission
-from prawcore.exceptions import PrawcoreException, NotFound
 
 # Configuration and connection settings
 CONFIG_MAP = "reddit-config2"
@@ -17,12 +20,14 @@ REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
 QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/reddit"
 
+
 def config(k: str) -> str:
     """
     Reads configuration from config map file
     """
     with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
         return f.read()
+
 
 def initialize_reddit():
     """
@@ -58,6 +63,7 @@ def initialize_reddit():
     except Exception as e:
         current_app.logger.warning(f"PRAW initial failed: {e}")
         sys.exit(1)
+
 
 def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> dict:
     """
@@ -140,6 +146,7 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
         "data": data,
     }
 
+
 def fetch_reddit_posts(reddit):
     """
     Fetches recent posts from the current subreddit tag in Redis, converts them to the target format,
@@ -174,6 +181,7 @@ def fetch_reddit_posts(reddit):
         # Push the tag back to Redis for the next round
         r.rpush(REDIS_TAGS_LIST, subreddit)
 
+
 def main():
     """
     Main entry point. Initializes Reddit client and triggers the post fetching process
@@ -181,6 +189,7 @@ def main():
     reddit = initialize_reddit()
     fetch_reddit_posts(reddit)
     return "OK"
+
 
 if __name__ == "__main__":
     main()
