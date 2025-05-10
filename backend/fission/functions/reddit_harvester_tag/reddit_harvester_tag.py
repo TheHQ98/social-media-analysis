@@ -1,3 +1,13 @@
+"""
+This program fetches Reddit posts and comments by tag and sends the data to a processing queue.
+
+1. Subreddit tags are managed via a Redis list to control which topics are fetched.
+2. For each subreddit, posts are retrieved in reverse chronological order (using 'before' pagination).
+3. Each post and its top-level comments are converted into a unified JSON structure.
+4. Post and comment data are sent to an external endpoint for further processing.
+5. Progress for each subreddit is tracked using a Redis key, and removed once END_DATE is reached.
+"""
+
 import sys
 from datetime import datetime, timezone
 import redis
