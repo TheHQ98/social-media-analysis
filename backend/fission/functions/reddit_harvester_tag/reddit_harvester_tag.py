@@ -1,5 +1,4 @@
 """
-<<<<<<< HEAD
 This program fetches Reddit posts and comments by tag and sends the data to a processing queue.
 
 1. Subreddit tags are managed via a Redis list to control which topics are fetched.
@@ -8,10 +7,6 @@ This program fetches Reddit posts and comments by tag and sends the data to a pr
 4. Post and comment data are sent to an external endpoint for further processing.
 5. Progress for each subreddit is tracked using a Redis key, and removed once END_DATE is reached.
 """
-=======
-
-"""
->>>>>>> d40879d7e1968c02e13d05b7ab238b36eca6b74c
 
 import sys
 from datetime import datetime, timezone

@@ -1,15 +1,10 @@
 """
-<<<<<<< HEAD
 Reddit tag-based post fetcher and processor.
 
 This script retrieves recent posts from a list of subreddits stored in Redis,
 formats them into a structured JSON format, and pushes them to an external processing queue.
 It maintains state using Redis and cycles through subreddit tags for continuous ingestion.
 """
-=======
-
-"""
->>>>>>> d40879d7e1968c02e13d05b7ab238b36eca6b74c
 
 import sys
 from datetime import datetime, timezone
