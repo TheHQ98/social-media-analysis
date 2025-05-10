@@ -1,5 +1,16 @@
 """
+BlueskyFetcher: Automated Bluesky Post Collection Service
 
+This script implements a service that fetches posts from the Bluesky social network API based on 
+search terms stored in Redis. It authenticates with Bluesky credentials, retrieves posts matching 
+search terms, converts them to a standardized format, and forwards them to a processing queue.
+
+Key components:
+- Authentication with Bluesky API using stored credentials
+- Redis-based search term queue management (rotating terms after use)
+- Post retrieval using Bluesky search API
+- Data transformation from Bluesky format to standardized internal format
+- Forwarding of formatted posts to a processing queue via HTTP
 """
 
 import requests
