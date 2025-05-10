@@ -7,7 +7,7 @@ import praw
 from praw.models import Submission
 from prawcore.exceptions import PrawcoreException, NotFound
 
-# Search range settings
+# Load a configuration value by key from the mounted config map directory
 CONFIG_MAP = "reddit-config2"
 REDIS_TAGS_LIST = "reddit:tags"
 END_DATE = datetime(2023, 1, 1, tzinfo=timezone.utc)
@@ -37,7 +37,7 @@ def initialize_reddit():
     Returns:
         praw.Reddit: Configured Reddit client
     """
-
+    # Local config keys
     client_id = config('REDDIT_CLIENT_ID')
     client_secret = config('REDDIT_CLIENT_SECRET')
     user_agent = config('REDDIT_USER_AGENT')
@@ -53,6 +53,7 @@ def initialize_reddit():
             user_agent=user_agent,
         )
         reddit.subreddits.popular(limit=1)
+        # Test if the credentials are valid by accessing a public endpoint
         print("PRAW initial success")
         return reddit
     except Exception as e:
@@ -101,7 +102,7 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
             author_username = "[Unavailable]"
             author_created = None
             link_karma = comment_karma = 0
-
+        # Author's information
         account_data = {
             "id": author_id,
             "username": author_username,
@@ -109,7 +110,7 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
             "followersCount/linkKarma": link_karma,
             "followingCount/commentKarma": comment_karma,
         }
-
+    # Combine title and selftext if the post is a self-post
     content = post.title
     if post.is_self and post.selftext:
         content += f"\n\n{post.selftext}"
@@ -117,7 +118,7 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
     tags = [post.link_flair_text] if post.link_flair_text else []
     if tags:
         tags.append(subreddit.lower())
-
+    # Post's information
     data = {
         "id": post.id,
         "createdAt": created_at,
@@ -141,6 +142,16 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
     }
 
 def convert_comment_to_target_format(comment, subreddit: str) -> dict:
+    """
+    Converts a PRAW Comment object into the target JSON structure
+
+    Args:
+        comment (praw.models.Comment): Reddit comment object
+        subreddit (str): Name of the subreddit where the comment was posted
+
+    Returns:
+        dict: Formatted dictionary representing the comment, including author and parent post metadata
+    """
     fetched_at = datetime.now(timezone.utc).isoformat(timespec='seconds') + 'Z'
     created_at = datetime.fromtimestamp(comment.created_utc, timezone.utc).isoformat(timespec='seconds') + 'Z'
     post = comment.submission
@@ -174,7 +185,7 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
             "followersCount/linkKarma": link_karma,
             "followingCount/commentKarma": comment_karma,
         }
-
+    # Add a "comment" tag to seperate from other posts, and also mark the id of its parent post
     tags = [f"comment: {post.id}", subreddit]
     if post.link_flair_text:
         tags.append(post.link_flair_text)
@@ -202,7 +213,7 @@ def convert_comment_to_target_format(comment, subreddit: str) -> dict:
     }
 
 def fetch_reddit_posts(reddit):
-    '''
+    """
     Fetches recent posts from the current subreddit tag in Redis, converts them to the target format,
     and uploads them to the queue endpoint
 
@@ -211,7 +222,8 @@ def fetch_reddit_posts(reddit):
 
     Returns:
         None
-    '''
+    """
+    # Connect to Redis to retrieve the current subreddit and state tracking
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
     subreddit = r.lindex(REDIS_TAGS_LIST, 0)
@@ -262,6 +274,9 @@ def fetch_reddit_posts(reddit):
         current_app.logger.warning(f"Touched END_DATE, removed r/{subreddit}")
 
 def main():
+    """
+    Main entry point. Initializes Reddit client and starts post fetching process
+    """
     # Initialize a Reddit API client
     reddit = initialize_reddit()
     fetch_reddit_posts(reddit)

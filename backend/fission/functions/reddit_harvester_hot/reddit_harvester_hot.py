@@ -3,19 +3,19 @@ from datetime import datetime, timezone
 import redis
 from flask import current_app
 import requests
-
 import praw
 from praw.models import Submission
 from prawcore.exceptions import PrawcoreException, NotFound
 
+# Configuration and connection settings
 CONFIG_MAP = "reddit-config2"
 REDIS_TAGS_LIST = "reddit:hot"
 LIMIT = 40
 
+# Connect to the server
 REDIS_HOST = "redis-headless.redis.svc.cluster.local"
 REDIS_PORT = 6379
 QUEUE_ENDPOINT = "http://router.fission.svc.cluster.local/enqueue/reddit"
-
 
 def config(k: str) -> str:
     """
@@ -24,20 +24,17 @@ def config(k: str) -> str:
     with open(f'/configs/default/{CONFIG_MAP}/{k}', 'r') as f:
         return f.read()
 
-
 def initialize_reddit():
     """
-    使用环境变量中的凭据初始化并返回一个 PRAW Reddit 实例。
+    Initializes and returns a PRAW Reddit instance using credentials from config files
 
-    环境变量需要设置:
-    - REDDIT_CLIENT_ID: 你的 Reddit 应用 Client ID
-    - REDDIT_CLIENT_SECRET: 你的 Reddit 应用 Client Secret
-    - REDDIT_USER_AGENT: 一个描述性的 User Agent 字符串 (例如 'MyRedditBot/1.0 by u/YourUsername')
-
-    如果凭据未设置或无效，将打印错误信息并退出程序。
+    Required config keys:
+    - REDDIT_CLIENT_ID: Reddit application Client ID
+    - REDDIT_CLIENT_SECRET: Reddit application Client Secret
+    - REDDIT_USER_AGENT: Descriptive user agent string (e.g., 'MyBot/1.0 by u/username')
 
     Returns:
-        praw.Reddit: 配置好的 PRAW Reddit 实例。
+        praw.Reddit: Configured Reddit client
     """
 
     client_id = config('REDDIT_CLIENT_ID')
@@ -45,7 +42,7 @@ def initialize_reddit():
     user_agent = config('REDDIT_USER_AGENT')
 
     if not all([client_id, client_secret, user_agent]):
-        print("错误：请设置环境变量 REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, 和 REDDIT_USER_AGENT。", file=sys.stderr)
+        print("Error: Please set REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, and REDDIT_USER_AGENT", file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -54,6 +51,7 @@ def initialize_reddit():
             client_secret=client_secret,
             user_agent=user_agent,
         )
+        # Test if credentials are valid by accessing a public endpoint
         reddit.subreddits.popular(limit=1)
         print("PRAW initial success")
         return reddit
@@ -61,16 +59,16 @@ def initialize_reddit():
         current_app.logger.warning(f"PRAW initial failed: {e}")
         sys.exit(1)
 
-
 def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> dict:
     """
-    将 PRAW Submission 对象转换为指定的目标 JSON 结构。
+    Converts a PRAW Submission object into the target JSON structure
 
     Args:
-        post (praw.models.Submission): Reddit 帖子对象。
-        subreddit: current subreddit topic
+        post (praw.models.Submission): Reddit post object
+        subreddit (str): Name of the current subreddit
+
     Returns:
-        dict: 符合目标结构的字典。
+        dict: Formatted dictionary matching the target schema
     """
     fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds") + "Z"
     created_at = (
@@ -103,7 +101,7 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
             author_username = "[Unavailable]"
             author_created = None
             link_karma = comment_karma = 0
-
+        # Author information
         account_data = {
             "id": author_id,
             "username": author_username,
@@ -111,11 +109,11 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
             "followersCount/linkKarma": link_karma,
             "followingCount/commentKarma": comment_karma,
         }
-
+    # Combine title and selftext if applicable
     content = post.title
     if post.is_self and post.selftext:
         content += f"\n\n{post.selftext}"
-
+    # Tags and subreddit information
     tags = [post.link_flair_text] if post.link_flair_text else []
     if tags:
         tags.append(subreddit.lower())
@@ -142,8 +140,18 @@ def convert_reddit_post_to_target_format(post: Submission, subreddit: str) -> di
         "data": data,
     }
 
-
 def fetch_reddit_posts(reddit):
+    """
+    Fetches recent posts from the current subreddit tag in Redis, converts them to the target format,
+    and uploads them to the queue endpoint
+
+    Args:
+        reddit (praw.Reddit): An initialized Reddit API client
+
+    Returns:
+        None
+    """
+    # Connect to Redis to retrieve subreddit and push status
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
     subreddit = r.lpop(REDIS_TAGS_LIST)
@@ -158,21 +166,21 @@ def fetch_reddit_posts(reddit):
         if not posts:
             current_app.logger.warning(f"No posts found for r/{subreddit}")
             return
-
+        # Process and push posts
         for post in posts:
             post_data = convert_reddit_post_to_target_format(post, subreddit)
             requests.post(QUEUE_ENDPOINT, json=post_data, timeout=5)
     finally:
+        # Push the tag back to Redis for the next round
         r.rpush(REDIS_TAGS_LIST, subreddit)
 
-
 def main():
+    """
+    Main entry point. Initializes Reddit client and triggers the post fetching process
+    """
     reddit = initialize_reddit()
-
     fetch_reddit_posts(reddit)
-
     return "OK"
-
 
 if __name__ == "__main__":
     main()
