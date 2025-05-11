@@ -14,6 +14,7 @@ Returns:
 import json
 from elasticsearch8 import Elasticsearch
 from flask import request, current_app
+from datetime import datetime
 
 ES_HOST = "https://elasticsearch-master.elastic.svc.cluster.local:9200"
 ES_INDEX = "socialplatform"
@@ -31,29 +32,28 @@ def config(k: str) -> str:
 
 def query(payload: dict) -> dict:
     """
-    check the payload context, and produce the correct format
-    :param payload: str, payload context
-    :return: correct format for elastic search
+        check the payload context, and produce the correct format
+        :param payload: str, payload context
+        :return: correct format for elastic search
     """
-
-    # get thg keywords from payload
     and_or = payload.get("combine") == "or"
     content_terms = payload.get("content", [])
     tag_terms = payload.get("tags", [])
     keyword_terms = payload.get("keywords", [])
+    date_range = payload.get("date_range")
 
     # return none, if not context provided
-    if not (content_terms or tag_terms or keyword_terms):
+    if not (content_terms or tag_terms or keyword_terms or date_range):
         return {"bool": {"must": [{"match_none": {}}]}}
 
     must, should, filter_content = [], [], []
 
     # produce data.content
     if content_terms:
+        q = " OR ".join(f'"{w}"' if " " in w else w for w in content_terms)
         clause = {
             "simple_query_string": {
-                "query": " OR ".join([f'"{w}"' if " " in w else w
-                                      for w in content_terms]),
+                "query": q,
                 "fields": ["data.content"],
                 "default_operator": "OR"
             }
@@ -70,16 +70,26 @@ def query(payload: dict) -> dict:
         clause = {"terms": {"keywords": keyword_terms}}
         (should if and_or else filter_content).append(clause)
 
-    query_output = {}
-    if must:
-        query_output["must"] = must
-    if filter_content:
-        query_output["filter"] = filter_content
-    if should:
-        query_output["should"] = should
-        query_output["minimum_should_match"] = 1
+    # produce date_range
+    if date_range:
+        gte = datetime.strptime(date_range["from"], "%d-%m-%Y").strftime("%Y-%m-%dT%H:%M:%SZ")
+        lte = datetime.strptime(date_range["to"], "%d-%m-%Y").strftime("%Y-%m-%dT%H:%M:%SZ")
+        filter_content.append({
+            "range": {
+                "data.createdAt": {"gte": gte, "lte": lte}
+            }
+        })
 
-    return {"bool": query_output}
+    bool_q = {}
+    if must:
+        bool_q["must"] = must
+    if filter_content:
+        bool_q["filter"] = filter_content
+    if should:
+        bool_q["should"] = should
+        bool_q["minimum_should_match"] = 1
+
+    return {"bool": bool_q}
 
 
 def handle_request(payload: str):
