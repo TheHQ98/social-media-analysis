@@ -61,23 +61,24 @@ while True:
         break  
 
 
-print("\n=== Top 5 keywords ===")
+print("\n=== Top 20 keywords ===")
 for month, keywords in sorted(monthly_keywords.items()):
     sorted_keywords = sorted(keywords.items(), key=lambda x: x[1], reverse=True)
-    top_5_keywords = sorted_keywords[:5]
+    top_20_keywords = sorted_keywords[:20]
     
-    print(f"\n{month} top 5")
-    for keyword, count in top_5_keywords:
+    print(f"\n{month} top 20")
+    for keyword, count in top_20_keywords:
         print(f"{keyword}: {count} times")
 
-    # Pie chart for each month
-    labels = [kw for kw, _ in top_5_keywords]
-    sizes = [count for _, count in top_5_keywords]
-    other_count = sum(keywords.values()) - sum(sizes)
-    labels.append('Other')
-    sizes.append(other_count)
+    # Bar chart for each month
+    labels = [kw for kw, _ in top_20_keywords]
+    values = [count for _, count in top_20_keywords]
 
-    plt.figure(figsize=(6,6))
-    plt.pie(sizes, labels=labels, autopct="%.2f%%", startangle=90, counterclock=False)
-    plt.title(f"Top 5 Keywords in {month}")
+    plt.figure(figsize=(10,6))
+    plt.bar(labels, values)
+    plt.title(f"Top 20 Keywords in {month}")
+    plt.xlabel("Keywords")
+    plt.ylabel("Frequency")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
     plt.show()
