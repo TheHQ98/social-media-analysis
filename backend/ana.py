@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from elasticsearch import Elasticsearch
 from collections import defaultdict
 from datetime import datetime
@@ -68,3 +69,15 @@ for month, keywords in sorted(monthly_keywords.items()):
     print(f"\n{month} top 5")
     for keyword, count in top_5_keywords:
         print(f"{keyword}: {count} times")
+
+    # Pie chart for each month
+    labels = [kw for kw, _ in top_5_keywords]
+    sizes = [count for _, count in top_5_keywords]
+    other_count = sum(keywords.values()) - sum(sizes)
+    labels.append('Other')
+    sizes.append(other_count)
+
+    plt.figure(figsize=(6,6))
+    plt.pie(sizes, labels=labels, autopct="%.2f%%", startangle=90, counterclock=False)
+    plt.title(f"Top 5 Keywords in {month}")
+    plt.show()
