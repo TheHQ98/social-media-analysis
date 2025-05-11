@@ -59,10 +59,8 @@ scroll_id = scroll_resp["_scroll_id"]
 total_hits = scroll_resp["hits"]["total"]["value"]
 print(f"Total Posts: {total_hits}")
 
-# 创建字典，按球队统计情感
 team_sentiment = defaultdict(lambda: {"positive": 0, "neutral": 0, "negative": 0})
 
-# 分页获取所有数据
 while True:
     for data in scroll_resp["hits"]["hits"]:
         post = data.get("_source", {})
