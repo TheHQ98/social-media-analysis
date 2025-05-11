@@ -11,17 +11,16 @@ es = Elasticsearch(
     basic_auth=("elastic", "elastic")
 )
 
-query_body = {
-    "track_total_hits": True,   
-    "query": {
-        "terms": {"data.tags":["melbourne", "sydney", "brisbane", "adelaide", "perth", "hobart", "darwin", "canberra"]}
-    },
-    "sort": [{"fetchedAt": {"order": "desc"}}]
-}
-
 all_resp = es.search(
     index="socialplatform",
-    body=query_body,
+    query={ 
+        "bool": {
+            "must": [
+                {"terms": {"data.tags":["melbourne", "sydney", "brisbane", "adelaide", "perth", "hobart", "darwin", "canberra"]}}
+            ]
+        }
+    },
+    track_total_hits=True, 
     size=10000  
 )
 
