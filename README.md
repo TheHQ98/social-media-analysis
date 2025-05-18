@@ -38,6 +38,7 @@ Project/
 │  ├─ mastodonApi.py  
 ├─ .gitignore  
 ├─ README.md
+├─ Report.pdf
 ```
 
 # Install
@@ -76,6 +77,79 @@ reddit-config2     3      19d
 shared-data        2      28d
 ```
 
+```
+(base) ➜  ~ kubectl describe configmap masto-config
+Name:         masto-config
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+ACCESS_TOKEN:
+----
+YourAccessToken
+
+API_BASE_URL:
+----
+https://mastodon.au
+
+
+BinaryData
+====
+
+Events:  <none>
+```
+```
+(base) ➜  ~ kubectl describe configmap reddit-config
+Name:         reddit-config
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+REDDIT_CLIENT_SECRET:
+----
+YourSecret
+
+REDDIT_USER_AGENT:
+----
+YourAgent
+
+REDDIT_CLIENT_ID:
+----
+YourID
+
+
+BinaryData
+====
+
+Events:  <none>
+```
+```
+(base) ➜  ~ kubectl describe configmap bluesky-config
+Name:         bluesky-config
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+BSKY_APP_PASSWORD:
+----
+YourPassword
+
+BSKY_USERNAME:
+----
+YourUsername
+
+
+BinaryData
+====
+
+Events:  <none>
+```
 ## Install index in Elastic Search
 Change location to `/database/`
 
@@ -142,28 +216,6 @@ fission mqtrigger create --spec --name addes \
   --metadata address=redis-headless.redis.svc.cluster.local:6379 \
   --metadata listLength=100 \
   --metadata listName=elastic
-
-fission mqtrigger create --name reddit-postprocessor \
-  --function post-processor \
-  --mqtype redis \
-  --mqtkind keda \
-  --topic reddit \
-  --errortopic post_reddit_errors \
-  --maxretries 3 \
-  --metadata address=redis-headless.redis.svc.cluster.local:6379 \
-  --metadata listLength=100 \
-  --metadata listName=reddit
-
-fission mqtrigger create --name bluesky-postprocessor \
-  --function post-processor \
-  --mqtype redis \
-  --mqtkind keda \
-  --topic bluesky \
-  --errortopic post_bluesky_errors \
-  --maxretries 3 \
-  --metadata address=redis-headless.redis.svc.cluster.local:6379 \
-  --metadata listLength=100 \
-  --metadata listName=bluesky
 ```
 and apply into the Cluster:
 ```bash
@@ -263,6 +315,17 @@ fission timer create --spec \
 	--name reddit-harvester-tag \
 	--function reddit-harvester-tag \
 	--cron "@every 60s"
+
+fission mqtrigger create --spec --name reddit-postprocessor \
+  --function post-processor \
+  --mqtype redis \
+  --mqtkind keda \
+  --topic reddit \
+  --errortopic post_reddit_errors \
+  --maxretries 3 \
+  --metadata address=redis-headless.redis.svc.cluster.local:6379 \
+  --metadata listLength=100 \
+  --metadata listName=reddit
 ```
 and apply into the Cluster:
 ```bash
@@ -325,12 +388,23 @@ fission timer create --spec \
 	--name bluesky-harvester-tag \
 	--function bluesky-harvester-tag \
 	--cron "@every 30s"
+
+fission mqtrigger create --spec --name bluesky-postprocessor \
+  --function post-processor \
+  --mqtype redis \
+  --mqtkind keda \
+  --topic bluesky \
+  --errortopic post_bluesky_errors \
+  --maxretries 3 \
+  --metadata address=redis-headless.redis.svc.cluster.local:6379 \
+  --metadata listLength=100 \
+  --metadata listName=bluesky
 ```
 and apply into the Cluster:
 ```bash
 fission spec apply --specdir specs --wait
 ```
-## Install frontend: data-filter
+## Install frontend data-filter in Fission
 `data-filter`: frontend oriented query interface service, as a system dedicated to the front-end to provide data filtering and search service interface
 
 change your current directory in `frontend/fission`. Add yaml:
