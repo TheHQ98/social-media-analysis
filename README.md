@@ -1,5 +1,7 @@
 # COMP90024_team_55  
 
+Our project report is [here](Report.pdf)
+
 ## Team
 
 | Name       | Email                           | Student Number |
@@ -54,6 +56,8 @@ Base on the guide, we completed the installation and configuration of the follow
 - ElasticSearch and Kibana
 - Redis
 - ConfigMap
+
+For the Redis URL, we're only using: `redis://redis-headless.redis.svc.cluster.local:6379`
 
 After install, the environment in Fission should contain:
 ```
@@ -163,7 +167,7 @@ curl -X PUT "http://localhost:9200/socialplatform" \
   -d @socialplatform.json
 ```
 ## Install enqueue, post_processor, add_es and harvesters MQTrigger in Fission
-change your current directory in `backend/fission`, and add yaml:
+change your current directory in `backend/fission/`, and add yaml:
 ```bash
 fission spec init
 
@@ -222,6 +226,7 @@ and apply into the Cluster:
 fission spec apply --specdir specs --wait
 ```
 ## Install Mastodon Harvesters
+Note: you must install `post-process` and `addes` functions and corresponding MQTrigger in previous section, the following Mastodon harvesters will finally send the data into the Redis list called `mastodon`.
 ### Mastodon Harvester
 install mastodon_harvester, function will fetch the latest 40 posts based on the timeline, the timer will call the function every 20 seconds, change your current directory in `backend/fission`. Add yaml:
 ``` bash
@@ -263,7 +268,7 @@ fission spec apply --specdir specs --wait
 Install mastodon_harvester_tag.
 In Redis, you need to create a list called `mastodon:tags`, add the tags in the list, and the function will crawl all the posts related to the tags from 1st of Jan, 2023 to now.
 
-change your current directory in `backend/fission`. Add yaml:
+change your current directory in `backend/fission/`. Add yaml:
 ```bash
 fission package create --spec --name mastodon-harvester-tag \
 	--source ./functions/mastodon_harvester_tag/__init__.py \
@@ -290,12 +295,13 @@ fission spec apply --specdir specs --wait
 ```
 
 ## Install Reddit Harvesters
+Note: you must install `post-process` and `addes` functions and corresponding MQTrigger in previous section, the following Reddit harvesters will finally send the data into the Redis list called `reddit`.
 ### Reddit Harvester tag
 Install reddit_harvester_tag, the function will crawl based on `new` list in Reddit
 
 In Redis, you need to create a list called `reddit:tags`, add the tags in the list, and the function will crawl all the posts related to the tags.
 
-change your current directory in `backend/fission`. Add yaml:
+change your current directory in `backend/fission/`. Add yaml:
 ```bash
 fission package create --spec --name reddit-harvester-tag \
 	--source ./functions/reddit_harvester_tag/__init__.py \
@@ -364,11 +370,13 @@ fission spec apply --specdir specs --wait
 ```
 
 ## Install Bluesky Harvester
+Note: you must install `post-process` and `addes` functions and corresponding MQTrigger in previous section, the following Bluesky harvester will finally send the data into the Redis list called `bluesky`.
+
 Install bluesky_harvester_tag, the function will crawl 40 post a time based `search_term`
 
 In Redis, you need to create a list called `bluesky:tags`, add the tags in the list, and the function will crawl all the posts related to the tags, 40 post each time.
 
-change your current directory in `backend/fission`. Add yaml:
+change your current directory in `backend/fission/`. Add yaml:
 ```bash
 fission package create --spec --name bluesky-harvester-tag \
 	--source ./functions/bluesky_harvester_tag/__init__.py \
@@ -407,7 +415,7 @@ fission spec apply --specdir specs --wait
 ## Install frontend data-filter in Fission
 `data-filter`: frontend oriented query interface service, as a system dedicated to the front-end to provide data filtering and search service interface
 
-change your current directory in `frontend/fission`. Add yaml:
+change your current directory in `frontend/fission/`. Add yaml:
 ```bash
 fission spec init
 
