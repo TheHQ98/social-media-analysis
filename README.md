@@ -4,8 +4,8 @@ This repository is a **mirror backup** of the original project hosted on GitLab:
 
 Please note that the original GitLab repository is **private** and not publicly accessible.
 
-COMP90024 Assignment 2 from Prof. Richard O. Sinnott
-``` plain text
+COMP90024 Assignment 2 **feedback** from Prof. Richard O. Sinnott
+```
 Report Comments. There was no need to submit your code in the zip file - a link to the gitlab repo would have been fine. You had three distinct scenarios: AFL, elections and cost of living. Certainly this should have had lots of data associated with it. The overall architecture as shown in Figure 3 is fine, but it could have been extended with some more details, e.g. the ElasticSearch indices, the API and the endpoints that were supported. It was nice that you explored all of the platforms (BlueSky, Mastodon, Reddit). 2.5m posts is a reasonable amount! It was nice that you collected the data and then decided on the scenarios (vs focusing on the scenarios and then trying to get the data which may or may not exist). The implementation section is nicely done and how the functions, triggers and processing works across the platforms. The pros and cons of NeCTAR and the related technologies could have been enhanced with insights based on your actual experiences. The error handling section was ok. The testing section was nicely defined. You might have also discussed end to end tests and shown examples of successful and failure test cases. The graphs, charts, analysis and discussions are nicely done. Overall the report was nicely done.
 
 Implementation comments:
