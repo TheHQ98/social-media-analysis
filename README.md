@@ -1,3 +1,27 @@
+# Mirror Notice!
+This repository is a **mirror backup** of the original project hosted on GitLab:  
+[https://gitlab.unimelb.edu.au/chenhaof/comp90024_team_55](https://gitlab.unimelb.edu.au/chenhaof/comp90024_team_55)
+
+Please note that the original GitLab repository is **private** and not publicly accessible.
+
+COMP90024 Assignment 2 from Prof. Richard O. Sinnott
+``` plain text
+Report Comments. There was no need to submit your code in the zip file - a link to the gitlab repo would have been fine. You had three distinct scenarios: AFL, elections and cost of living. Certainly this should have had lots of data associated with it. The overall architecture as shown in Figure 3 is fine, but it could have been extended with some more details, e.g. the ElasticSearch indices, the API and the endpoints that were supported. It was nice that you explored all of the platforms (BlueSky, Mastodon, Reddit). 2.5m posts is a reasonable amount! It was nice that you collected the data and then decided on the scenarios (vs focusing on the scenarios and then trying to get the data which may or may not exist). The implementation section is nicely done and how the functions, triggers and processing works across the platforms. The pros and cons of NeCTAR and the related technologies could have been enhanced with insights based on your actual experiences. The error handling section was ok. The testing section was nicely defined. You might have also discussed end to end tests and shown examples of successful and failure test cases. The graphs, charts, analysis and discussions are nicely done. Overall the report was nicely done.
+
+Implementation comments:
+Overall: a good harvesting pipeline, but testing and API are of insufficient quality.
+ReSTful API: the APi is composed of a single resource and incomplete, since a Jupyter notebook queries ES directly.
+Architecture: ConfigMaps are used consistently; secrets are not used; use of message queues;
+Harvesting: harvesting from Reddit, BlueSky, and Mastodon; large quantity of data harvested (3.5M posts, 5+GB); the harvesting of all three platforms is ongoing at the rate of about 50K per day.
+Use of Fission: there are some leftover routes and functions from the workshop; use or routes, triggers, specs, and MQ triggers;
+Use of ElasticSearch: use of shards; use of explicit mappings; use of pagination; use of complex queries;
+Error handling: exceptions are often too wide in scope; inconsistent use of logging; no use of HTTP status codes.
+Test quality: the tests look more like proof-of-concepts for harvesting from Mastodon than test cases.
+Documentation: the README is minimal and leaves out testing, creation of ConfigMaps, and the index creation is wrong (the JSON does not exist).
+Repo layout: overall clean repo.
+Code quality: dependencies are versioned; the reading of ConfigMaps should have been put in a common library; some parameters should have been put in ConfigMaps.
+```
+
 # COMP90024_team_55  
 
 Our project report is [here](Report.pdf)
